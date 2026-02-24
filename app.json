@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Cleaning Service",
+    "slug": "cleaning-service-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#2c7a7b"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them."
+        }
+      ]
+    ],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.cleaningservice.mobile"
+    },
+    "android": {
+      "package": "com.cleaningservice.mobile"
+    },
+    "web": {},
+    "extra": {
+      "eas": {
+        "projectId": "f5bd8789-829f-4f61-9454-db9577f458c2"
+      }
+    }
+  }
+}

@@ -7,6 +7,7 @@ import {
   ImageBackground,
   TouchableOpacity,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -18,6 +19,10 @@ import Button from '../../components/Common/Button';
 const HomePage = () => {
   const { t } = useLanguage();
   const navigation = useNavigation();
+  const { width, height } = useWindowDimensions();
+  const isSmallScreen = width < 360;
+  const heroHeight = Math.min(Math.max(height * 0.5, 360), 520);
+  const quickCardWidth = isSmallScreen ? '100%' : '48%';
   const goToServices = () => navigation.navigate('Services');
   const goToService = (route) => () => navigation.navigate(route);
   const goToScreen = (screen) => () => navigation.navigate(screen);
@@ -72,7 +77,7 @@ const HomePage = () => {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Hero Section */}
-      <View style={styles.heroContainer}>
+      <View style={[styles.heroContainer, { height: heroHeight }]}>
         <ImageBackground
           source={{ uri: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=1200&h=800&fit=crop' }}
           style={styles.heroImage}
@@ -85,26 +90,26 @@ const HomePage = () => {
             ]}
             style={styles.heroGradient}
           >
-            <View style={styles.heroContent}>
+            <View style={[styles.heroContent, { paddingHorizontal: isSmallScreen ? spacing.sm : 0 }]}>
               <Logo width={120} height={120} />
-              <Text style={styles.heroTitle}>
+              <Text style={[styles.heroTitle, { fontSize: isSmallScreen ? typography.fontSize.xxl : typography.fontSize.xxxl }]}>
                 {t('home.heroTitle', 'Professional Cleaning Services')}
               </Text>
-              <Text style={styles.heroSubtitle}>
+              <Text style={[styles.heroSubtitle, { fontSize: isSmallScreen ? typography.fontSize.md : typography.fontSize.lg }]}>
                 {t('home.heroSubtitle', 'Your trusted partner for quality cleaning solutions')}
               </Text>
-              <View style={styles.heroButtons}>
+              <View style={[styles.heroButtons, isSmallScreen && { flexDirection: 'column', width: '100%' }]}>
                 <Button
                   title={t('nav.services', 'Services')}
                   onPress={goToServices}
                   variant="primary"
-                  style={styles.heroButton}
+                  style={[styles.heroButton, isSmallScreen && { width: '100%' }]}
                 />
                 <Button
                   title={t('nav.contact', 'Contact')}
                   onPress={goToScreen('Contact')}
                   variant="outline"
-                  style={styles.heroButton}
+                  style={[styles.heroButton, isSmallScreen && { width: '100%' }]}
                 />
               </View>
             </View>
@@ -119,7 +124,7 @@ const HomePage = () => {
         </Text>
         <View style={styles.quickLinks}>
           <TouchableOpacity
-            style={styles.quickLinkCard}
+            style={[styles.quickLinkCard, { width: quickCardWidth }]}
             onPress={goToServices}
             activeOpacity={0.8}
           >
@@ -127,7 +132,7 @@ const HomePage = () => {
             <Text style={styles.quickLinkTitle}>{t('nav.services', 'Services')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.quickLinkCard}
+            style={[styles.quickLinkCard, { width: quickCardWidth }]}
             onPress={goToScreen('About')}
             activeOpacity={0.8}
           >
@@ -135,7 +140,7 @@ const HomePage = () => {
             <Text style={styles.quickLinkTitle}>{t('nav.about', 'About')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.quickLinkCard}
+            style={[styles.quickLinkCard, { width: quickCardWidth }]}
             onPress={goToScreen('Contact')}
             activeOpacity={0.8}
           >
@@ -143,7 +148,7 @@ const HomePage = () => {
             <Text style={styles.quickLinkTitle}>{t('nav.contact', 'Contact')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.quickLinkCard}
+            style={[styles.quickLinkCard, { width: quickCardWidth }]}
             onPress={goToScreen('Careers')}
             activeOpacity={0.8}
           >

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Animated,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -17,11 +18,13 @@ import Logo from '../Common/Logo';
 
 const DashboardSidebar = ({ menuItems, isOpen, onClose }) => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { userData, logout } = useAuth();
   const { t } = useLanguage();
   const navigation = useNavigation();
   const [userPhoto, setUserPhoto] = useState(null);
-  const [slideAnim] = useState(new Animated.Value(-260));
+  const sidebarWidth = Math.min(320, Math.max(240, Math.round(width * 0.78)));
+  const slideAnim = useRef(new Animated.Value(-sidebarWidth)).current;
 
   useEffect(() => {
     if (userData?.photo) {
@@ -31,11 +34,17 @@ const DashboardSidebar = ({ menuItems, isOpen, onClose }) => {
 
   useEffect(() => {
     Animated.timing(slideAnim, {
-      toValue: isOpen ? 0 : -260,
+      toValue: isOpen ? 0 : -sidebarWidth,
       duration: 300,
       useNativeDriver: true,
     }).start();
-  }, [isOpen, slideAnim]);
+  }, [isOpen, slideAnim, sidebarWidth]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      slideAnim.setValue(-sidebarWidth);
+    }
+  }, [isOpen, slideAnim, sidebarWidth]);
 
   const handleLogout = async () => {
     onClose();
@@ -49,7 +58,7 @@ const DashboardSidebar = ({ menuItems, isOpen, onClose }) => {
       {/* Overlay for mobile */}
       {isOpen && (
         <TouchableOpacity
-          style={styles.overlay}
+          style={[styles.overlay, { top: Math.max(insets.top + 52, 60) }]}
           activeOpacity={1}
           onPress={onClose}
         />
@@ -59,6 +68,7 @@ const DashboardSidebar = ({ menuItems, isOpen, onClose }) => {
       <Animated.View
         style={[
           styles.sidebar,
+          { width: sidebarWidth },
           {
             transform: [{ translateX: slideAnim }],
           },
@@ -136,7 +146,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     // Leave space for the dashboard header so the menu button
     // can still be tapped to close the sidebar.
-    top: 60,
     left: 0,
     right: 0,
     bottom: 0,
@@ -148,7 +157,6 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 260,
     backgroundColor: '#1a4a4d', // Matches hero section gradient (blend of rgba(0, 64, 102) blue and rgba(51, 122, 28) green)
     zIndex: 1000,
   },

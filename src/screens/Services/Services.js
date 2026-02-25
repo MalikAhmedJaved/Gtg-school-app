@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ImageBackground, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -8,6 +8,9 @@ import { colors, spacing, typography, borderRadius, shadows } from '../../consta
 const Services = () => {
   const { t } = useLanguage();
   const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const imageHeight = Math.max(180, Math.min(280, Math.round(width * 0.55)));
+  const smallScreen = width < 360;
 
   const services = [
     {
@@ -36,7 +39,7 @@ const Services = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>
+        <Text style={[styles.title, smallScreen && { fontSize: typography.fontSize.xxl }] }>
           {t('services.pageTitle', 'Our Services')}
         </Text>
         <Text style={styles.subtitle}>
@@ -53,7 +56,7 @@ const Services = () => {
         >
           <ImageBackground
             source={{ uri: service.image }}
-            style={styles.serviceImage}
+            style={[styles.serviceImage, { height: imageHeight }]}
             resizeMode="cover"
           >
             <LinearGradient

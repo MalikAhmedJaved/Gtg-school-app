@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, useWindowDimensions } from 'react-native';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../../components/Common/Button';
@@ -8,6 +8,9 @@ import { useNavigation } from '@react-navigation/native';
 const MoveInMoveOut = () => {
   const { t } = useLanguage();
   const navigation = useNavigation();
+  const { width } = useWindowDimensions();
+  const imageHeight = Math.max(180, Math.min(280, Math.round(width * 0.58)));
+  const compact = width < 360;
 
   const features = [
     t('services.moveInMoveOut.features.kitchen', 'Complete kitchen deep clean including inside all appliances'),
@@ -21,7 +24,7 @@ const MoveInMoveOut = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>
+        <Text style={[styles.title, compact && { fontSize: typography.fontSize.xxl }] }>
           {t('services.moveInMoveOut.title', 'Move-in/Move-out Cleaning Services')}
         </Text>
         <Text style={styles.subtitle}>
@@ -29,10 +32,10 @@ const MoveInMoveOut = () => {
         </Text>
       </View>
 
-      <View style={styles.content}>
+      <View style={[styles.content, compact && { padding: spacing.lg }]}>
         <Image
           source={{ uri: 'https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&h=600&fit=crop' }}
-          style={styles.image}
+          style={[styles.image, { height: imageHeight }]}
           resizeMode="cover"
         />
 

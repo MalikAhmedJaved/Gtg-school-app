@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
+import { useWindowDimensions } from 'react-native';
 
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -173,19 +174,24 @@ function MenuStack() {
 
 function MainTabs() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const compactTabBar = width < 390;
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: '#00AEEF',
         tabBarInactiveTintColor: '#718096',
+        tabBarShowLabel: !compactTabBar,
         tabBarStyle: {
           backgroundColor: '#fff',
           borderTopColor: '#e2e8f0',
-          paddingBottom: Math.max(insets.bottom, 8),
-          height: 56 + Math.max(insets.bottom, 8),
+          paddingBottom: Math.max(insets.bottom, compactTabBar ? 6 : 8),
+          paddingTop: compactTabBar ? 6 : 4,
+          height: (compactTabBar ? 52 : 58) + Math.max(insets.bottom, compactTabBar ? 6 : 8),
         },
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        tabBarItemStyle: { paddingHorizontal: compactTabBar ? 0 : 2 },
       }}
     >
       <Tab.Screen
@@ -193,15 +199,15 @@ function MainTabs() {
         component={OrdersStack}
         options={{
           title: 'Orders',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'checkmark-circle' : 'checkmark-circle-outline'} size={size} color={color} />,
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'checkmark-circle' : 'checkmark-circle-outline'} size={compactTabBar ? 20 : size} color={color} />,
         }}
       />
       <Tab.Screen
         name="NewOrderTab"
         component={NewOrderStack}
         options={{
-          title: 'New Order',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={size} color={color} />,
+          title: 'New',
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={compactTabBar ? 20 : size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -209,7 +215,7 @@ function MainTabs() {
         component={ProfileScreen}
         options={{
           title: 'Profile',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />,
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={compactTabBar ? 20 : size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -217,15 +223,15 @@ function MainTabs() {
         component={MenuStack}
         options={{
           title: 'Menu',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'menu' : 'menu-outline'} size={size} color={color} />,
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'menu' : 'menu-outline'} size={compactTabBar ? 20 : size} color={color} />,
         }}
       />
       <Tab.Screen
         name="MessagesTab"
         component={ChatScreen}
         options={{
-          title: 'Messages',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={size} color={color} />,
+          title: 'Chat',
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={compactTabBar ? 20 : size} color={color} />,
         }}
       />
     </Tab.Navigator>

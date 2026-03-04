@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,32 +8,96 @@ import {
   Image,
   Alert,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../Common/Button';
 import * as ImagePicker from 'expo-image-picker';
+import api from '../../utils/api';
+import { navigate as rootNavigate } from '../../utils/rootNavigation';
 
 const Profile = ({ userRole }) => {
   const { t } = useLanguage();
-  const { userData } = useAuth();
+  const { userData, updateUserData, logout } = useAuth();
   const [formData, setFormData] = useState({
-    name: userData?.name || '',
-    email: userData?.email || '',
-    phone: userData?.phone || '',
-    address: userData?.address || '',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    zipCode: '',
     password: '',
     confirmPassword: '',
-    clientType: userData?.clientType || 'private',
-    companyName: userData?.companyName || '',
-    vatNumber: userData?.vatNumber || '',
-    experience: userData?.experience || 0,
-    hourlyPrice: userData?.hourlyPrice || '',
-    currency: userData?.currency || 'USD',
+    clientType: 'private',
+    companyName: '',
+    vatNumber: '',
+    experience: 0,
+    hourlyPrice: '',
+    currency: 'USD',
   });
-  const [userPhoto, setUserPhoto] = useState(userData?.photo || null);
+  const [userPhoto, setUserPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+
+  // Fetch fresh profile data from the API on mount
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    setFetching(true);
+    try {
+      const response = await api.get('/users/profile');
+      if (response.data.success && response.data.data) {
+        const user = response.data.data;
+        setFormData({
+          name: user.name || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          address: user.address || '',
+          city: user.city || '',
+          zipCode: user.zipCode || '',
+          password: '',
+          confirmPassword: '',
+          clientType: user.clientType || 'private',
+          companyName: user.companyName || '',
+          vatNumber: user.vatNumber || '',
+          experience: user.experience || 0,
+          hourlyPrice: user.hourlyPrice != null ? String(user.hourlyPrice) : '',
+          currency: user.currency || 'USD',
+        });
+        setUserPhoto(user.photo || null);
+        // Keep AuthContext in sync
+        await updateUserData(user);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      // Fall back to cached userData
+      if (userData) {
+        setFormData({
+          name: userData.name || '',
+          email: userData.email || '',
+          phone: userData.phone || '',
+          address: userData.address || '',
+          city: userData.city || '',
+          zipCode: userData.zipCode || '',
+          password: '',
+          confirmPassword: '',
+          clientType: userData.clientType || 'private',
+          companyName: userData.companyName || '',
+          vatNumber: userData.vatNumber || '',
+          experience: userData.experience || 0,
+          hourlyPrice: userData.hourlyPrice != null ? String(userData.hourlyPrice) : '',
+          currency: userData.currency || 'USD',
+        });
+        setUserPhoto(userData.photo || null);
+      }
+    } finally {
+      setFetching(false);
+    }
+  };
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -79,15 +143,70 @@ const Profile = ({ userRole }) => {
 
     setLoading(true);
     try {
-      // In a real app, this would call the API
-      Alert.alert('Success', 'Profile updated successfully!');
-      setFormData({ ...formData, password: '', confirmPassword: '' });
+      // Build the update payload
+      const updatePayload = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        city: formData.city,
+        zipCode: formData.zipCode,
+        photo: userPhoto,
+        ...(userRole !== 'client' && userRole !== 'cleaner' && {
+          clientType: formData.clientType,
+          companyName: formData.companyName,
+          vatNumber: formData.vatNumber,
+          experience: formData.experience,
+          hourlyPrice: formData.hourlyPrice ? parseFloat(formData.hourlyPrice) : null,
+          currency: formData.currency,
+        }),
+      };
+
+      // Only include password if user is changing it
+      if (formData.password) {
+        updatePayload.password = formData.password;
+      }
+
+      const response = await api.put('/users/profile', updatePayload);
+
+      if (response.data.success) {
+        // Update local auth context with fresh data
+        const updatedUser = response.data.data || { ...userData, ...updatePayload };
+        await updateUserData(updatedUser);
+        Alert.alert('Success', 'Profile updated successfully!');
+        setFormData({ ...formData, password: '', confirmPassword: '' });
+      } else {
+        Alert.alert('Error', response.data.message || 'Failed to update profile');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to update profile');
+      console.error('Profile update error:', error);
+      const message = error.response?.data?.message || 'Failed to update profile. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      setTimeout(() => rootNavigate('Login'), 50);
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Error', 'Failed to logout. Please try again.');
+    }
+  };
+
+  if (fetching) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: spacing.md, color: colors.textLight }}>
+          {t('common.loading', 'Loading...')}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -186,6 +305,26 @@ const Profile = ({ userRole }) => {
               multiline
             />
           </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>{t('auth.city', 'City')}</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.city}
+              onChangeText={(value) => handleChange('city', value)}
+              placeholder="Enter your city"
+            />
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>{t('auth.zipCode', 'Zip Code')}</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.zipCode}
+              onChangeText={(value) => handleChange('zipCode', value)}
+              placeholder="Enter your zip code"
+            />
+          </View>
         </View>
 
         {/* Client-specific fields */}
@@ -196,67 +335,50 @@ const Profile = ({ userRole }) => {
             </Text>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>{t('auth.clientType', 'Client Type')} *</Text>
-              <View style={styles.radioGroup}>
-                <TouchableOpacity
-                  style={[styles.radioOption, formData.clientType === 'private' && styles.radioOptionActive]}
-                  onPress={() => handleChange('clientType', 'private')}
-                >
-                  <Text style={[styles.radioText, formData.clientType === 'private' && styles.radioTextActive]}>
-                    {t('auth.private', 'Private')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.radioOption, formData.clientType === 'company' && styles.radioOptionActive]}
-                  onPress={() => handleChange('clientType', 'company')}
-                >
-                  <Text style={[styles.radioText, formData.clientType === 'company' && styles.radioTextActive]}>
-                    {t('auth.company', 'Company')}
-                  </Text>
-                </TouchableOpacity>
+              <Text style={styles.label}>{t('auth.clientType', 'Client Type')}</Text>
+              <View style={styles.readOnlyValue}>
+                <Text style={styles.readOnlyText}>
+                  {formData.clientType === 'company'
+                    ? t('auth.company', 'Company')
+                    : t('auth.private', 'Private')}
+                </Text>
               </View>
+              <Text style={styles.readOnlyHint}>
+                {t('profile.clientTypeManagedByAdmin', 'Client type can only be updated by admin.')}
+              </Text>
             </View>
 
             {formData.clientType === 'company' && (
               <>
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>{t('auth.companyName', 'Company Name')} *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.companyName}
-                    onChangeText={(value) => handleChange('companyName', value)}
-                    placeholder="Enter company name"
-                  />
+                  <Text style={styles.label}>{t('auth.companyName', 'Company Name')}</Text>
+                  <View style={styles.readOnlyValue}>
+                    <Text style={styles.readOnlyText}>{formData.companyName || '-'}</Text>
+                  </View>
                 </View>
 
                 <View style={styles.formGroup}>
-                  <Text style={styles.label}>{t('auth.vatNumber', 'VAT Number')} *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.vatNumber}
-                    onChangeText={(value) => handleChange('vatNumber', value)}
-                    placeholder="Enter VAT number"
-                  />
+                  <Text style={styles.label}>{t('auth.vatNumber', 'VAT Number')}</Text>
+                  <View style={styles.readOnlyValue}>
+                    <Text style={styles.readOnlyText}>{formData.vatNumber || '-'}</Text>
+                  </View>
                 </View>
               </>
             )}
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>{t('profile.hourlyPrice', 'Hourly Price')}</Text>
+              <Text style={styles.label}>{t('profile.hourlyRate', 'Hourly Rate')}</Text>
               <View style={styles.priceRow}>
                 <View style={styles.currencySelector}>
-                  <Text style={styles.currencyText}>
-                    {formData.currency === 'USD' ? '$' : formData.currency === 'EUR' ? '€' : 'kr'}
-                  </Text>
+                  <Text style={styles.currencyText}>KR</Text>
                 </View>
-                <TextInput
-                  style={[styles.input, styles.priceInput]}
-                  value={formData.hourlyPrice}
-                  onChangeText={(value) => handleChange('hourlyPrice', value)}
-                  placeholder="Enter hourly rate"
-                  keyboardType="decimal-pad"
-                />
+                <View style={[styles.input, styles.priceInput, styles.readOnlyValueInline]}>
+                  <Text style={styles.readOnlyText}>{formData.hourlyPrice || '-'}</Text>
+                </View>
               </View>
+              <Text style={styles.readOnlyHint}>
+                {t('profile.hourlyRateManagedByAdmin', 'Hourly rate is agreed and managed by admin.')}
+              </Text>
             </View>
           </View>
         )}
@@ -270,31 +392,29 @@ const Profile = ({ userRole }) => {
 
             <View style={styles.formGroup}>
               <Text style={styles.label}>Experience (years)</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.experience.toString()}
-                onChangeText={(value) => handleChange('experience', parseInt(value) || 0)}
-                placeholder="Years of experience"
-                keyboardType="numeric"
-              />
+              <View style={styles.readOnlyValue}>
+                <Text style={styles.readOnlyText}>{formData.experience || 0}</Text>
+              </View>
+              <Text style={styles.readOnlyHint}>
+                {t('profile.experienceManagedByAdmin', 'Experience can only be updated by admin.')}
+              </Text>
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>{t('profile.hourlyPrice', 'Hourly Price')}</Text>
+              <Text style={styles.label}>{t('profile.hourlyRate', 'Hourly Rate')}</Text>
               <View style={styles.priceRow}>
                 <View style={styles.currencySelector}>
                   <Text style={styles.currencyText}>
                     {formData.currency === 'USD' ? '$' : formData.currency === 'EUR' ? '€' : 'kr'}
                   </Text>
                 </View>
-                <TextInput
-                  style={[styles.input, styles.priceInput]}
-                  value={formData.hourlyPrice}
-                  onChangeText={(value) => handleChange('hourlyPrice', value)}
-                  placeholder="Enter hourly rate"
-                  keyboardType="decimal-pad"
-                />
+                <View style={[styles.input, styles.priceInput, styles.readOnlyValueInline]}>
+                  <Text style={styles.readOnlyText}>{formData.hourlyPrice || '-'}</Text>
+                </View>
               </View>
+              <Text style={styles.readOnlyHint}>
+                {t('profile.hourlyRateManagedByAdmin', 'Hourly rate is agreed and managed by admin.')}
+              </Text>
             </View>
           </View>
         )}
@@ -338,6 +458,12 @@ const Profile = ({ userRole }) => {
             variant="primary"
             loading={loading}
             style={styles.saveButton}
+          />
+          <Button
+            title={t('auth.logout', 'Logout')}
+            onPress={handleLogout}
+            variant="danger"
+            style={styles.logoutButton}
           />
         </View>
       </ScrollView>
@@ -520,6 +646,29 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginBottom: spacing.md,
+  },
+  logoutButton: {
+    marginBottom: spacing.md,
+  },
+  readOnlyValue: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    backgroundColor: colors.backgroundLight,
+  },
+  readOnlyValueInline: {
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundLight,
+  },
+  readOnlyText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textDark,
+  },
+  readOnlyHint: {
+    marginTop: spacing.xs,
+    fontSize: typography.fontSize.xs,
+    color: colors.textLight,
   },
 });
 

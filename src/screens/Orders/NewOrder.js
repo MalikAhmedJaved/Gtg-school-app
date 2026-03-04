@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,45 +9,98 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  TouchableOpacity,
+  Modal,
+  useWindowDimensions,
 } from 'react-native';
+import { Calendar } from 'react-native-big-calendar';
+import { Picker } from '@react-native-picker/picker';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { navigate as rootNavigate } from '../../utils/rootNavigation';
-import { createOrder, calculateHours, createEmptyOrder } from '../../utils/orderService';
+import { calculateHours, createEmptyOrder } from '../../utils/orderService';
 import Button from '../../components/Common/Button';
 import Checkbox from '../../components/Common/Checkbox';
 import RadioGroup from '../../components/Common/RadioGroup';
 import SectionCard from '../../components/Common/SectionCard';
 import InfoBox from '../../components/Common/InfoBox';
+import api from '../../utils/api';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
-const NewOrder = ({ navigation }) => {
+const WEEKDAYS = [
+  { value: 0, short: 'S' },
+  { value: 1, short: 'M' },
+  { value: 2, short: 'T' },
+  { value: 3, short: 'W' },
+  { value: 4, short: 'T' },
+  { value: 5, short: 'F' },
+  { value: 6, short: 'S' },
+];
+
+const DEFAULT_EVENT_FORM = {
+  title: '',
+  date: new Date().toISOString().slice(0, 10),
+  startTime: '09:00',
+  endTime: '09:30',
+  allDay: false,
+  recurring: false,
+  recurrenceEvery: 1,
+  recurrenceDays: [],
+  recurrenceUntil: '',
+  address: '',
+  cleaningType: 'residential',
+  checklistItems: [],
+  comments: '',
+};
+
+const NewOrder = ({ navigation, route }) => {
   const { t } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, userRole, userData } = useAuth();
+  const editOrder = route?.params?.editOrder;
+  const isEditMode = Boolean(route?.params?.editMode && (editOrder?.id || editOrder?._id));
+  const { width } = useWindowDimensions();
+  const isNarrowScreen = width <= 480;
+  const isWeb = Platform.OS === 'web';
+  const isAdmin = userRole === 'admin';
+  const isCleaner = userRole === 'cleaner';
   const [order, setOrder] = useState(createEmptyOrder());
   const [submitting, setSubmitting] = useState(false);
-
-  // If not authenticated, show login prompt
-  if (!isAuthenticated) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loginPrompt}>
-          <Text style={styles.loginTitle}>{t('orders.loginRequired', 'Login Required')}</Text>
-          <Text style={styles.loginMessage}>
-            {t('orders.loginRequiredMsg', 'Please log in to place a new order.')}
-          </Text>
-          <Button
-            title={t('orders.goToLogin', 'Go to Login')}
-            onPress={() => rootNavigate('MenuTab', { screen: 'Login' })}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [clients, setClients] = useState([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [showNewEvent, setShowNewEvent] = useState(false);
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarMode, setCalendarMode] = useState('month');
+  const [eventForm, setEventForm] = useState(DEFAULT_EVENT_FORM);
+  const [checklistInput, setChecklistInput] = useState('');
+  const [eventError, setEventError] = useState('');
+  const [hasBookingEvent, setHasBookingEvent] = useState(false);
+  const [showNativeDatePicker, setShowNativeDatePicker] = useState(false);
+  const [showNativeStartTimePicker, setShowNativeStartTimePicker] = useState(false);
+  const [showNativeEndTimePicker, setShowNativeEndTimePicker] = useState(false);
+  const [showNativeUntilDatePicker, setShowNativeUntilDatePicker] = useState(false);
+  const estimatedHours = useMemo(() => calculateHours(order), [order]);
+  const modalWidth = Math.min(width - 16, 560);
+  const webInputStyle = {
+    width: '100%',
+    border: `1px solid ${colors.gray[300]}`,
+    borderRadius: borderRadius.md,
+    padding: 10,
+    fontSize: 16,
+    color: colors.text,
+    backgroundColor: colors.white,
+    marginBottom: 8,
+    boxSizing: 'border-box',
+  };
 
   const updateOrder = (field, value) => {
     setOrder((prev) => ({ ...prev, [field]: value }));
   };
+
 
   const toggleAsNeeded = (item) => {
     setOrder((prev) => {
@@ -90,7 +143,270 @@ const NewOrder = ({ navigation }) => {
     }));
   };
 
-  const estimatedHours = useMemo(() => calculateHours(order), [order]);
+  const mapCleaningType = (serviceType, cleaningCategory) => {
+    if (serviceType === 'commercial') return 'commercial';
+    if (serviceType === 'moveinout') return 'move';
+    if (cleaningCategory === 'main') return 'deep';
+    return 'residential';
+  };
+
+  const mapServiceFromCleaningType = (cleaningType) => {
+    if (cleaningType === 'commercial') {
+      return { serviceType: 'commercial', cleaningCategory: 'standard' };
+    }
+    if (cleaningType === 'move') {
+      return { serviceType: 'moveinout', cleaningCategory: 'standard' };
+    }
+    if (cleaningType === 'deep') {
+      return { serviceType: 'home', cleaningCategory: 'main' };
+    }
+    return { serviceType: 'home', cleaningCategory: 'standard' };
+  };
+
+  const hydrateOrderFromTask = (task) => {
+    const fallback = createEmptyOrder();
+    if (!task) return fallback;
+
+    const checklist = Array.isArray(task.checklist) ? task.checklist : [];
+    const asNeededOptions = ['wipingFrames', 'limeShower', 'vacuumFurniture', 'cobwebs'];
+    const mainExtrasOptions = [
+      'wipingFrames',
+      'wipingWindowEdges',
+      'wipingCeilingEdges',
+      'windowCleaning',
+      'blindsCleaned',
+      'furnitureVacuumed',
+      'behindFurniture',
+      'cleaningWallsCeilings',
+      'underCarpets',
+      'mirrorsGlass',
+      'ceilingLights',
+      'closedSpaces',
+      'insideCupboards',
+      'woodenFloors',
+      'ovenFridge',
+    ];
+
+    const equipment = { ...fallback.equipment };
+    checklist.forEach((item) => {
+      if (typeof item === 'string' && item.startsWith('equipment:')) {
+        const key = item.replace('equipment:', '');
+        if (Object.prototype.hasOwnProperty.call(equipment, key)) {
+          equipment[key] = true;
+        }
+      }
+    });
+
+    const serviceType = task.serviceType
+      ? task.serviceType
+      : (task.cleaningType === 'residential'
+        ? 'home'
+        : task.cleaningType === 'move'
+          ? 'moveinout'
+          : task.cleaningType || 'home');
+
+    const cleaningCategory = task.cleaningCategory
+      ? task.cleaningCategory
+      : (task.cleaningType === 'deep' ? 'main' : 'standard');
+
+    return {
+      ...fallback,
+      serviceType,
+      cleaningCategory,
+      asNeededSelections: checklist.filter((item) => asNeededOptions.includes(item)),
+      mainCleaningExtras: checklist.filter((item) => mainExtrasOptions.includes(item)),
+      adhocSelections: checklist.filter((item) => ['standardWithout', 'vacuumAndFloor', 'bathroomAndFloor', 'largeHome'].includes(item)),
+      extraTargeted: {
+        animalHair: checklist.includes('animalHair'),
+        smoking: checklist.includes('smoking'),
+      },
+      equipment,
+      address: task.address || '',
+      date: task.date || '',
+      time: task.time || '',
+      manualHours: Number(task.calculatedHours || task.hours || task.manualHours || fallback.manualHours),
+      comments: task.comments || '',
+    };
+  };
+
+  const buildChecklist = () => {
+    const checklist = [];
+    if (order.asNeededSelections?.length) checklist.push(...order.asNeededSelections);
+    if (order.mainCleaningExtras?.length) checklist.push(...order.mainCleaningExtras);
+    if (order.adhocSelections?.length) checklist.push(...order.adhocSelections);
+    if (order.extraTargeted?.animalHair) checklist.push('animalHair');
+    if (order.extraTargeted?.smoking) checklist.push('smoking');
+    if (order.equipment) {
+      Object.entries(order.equipment).forEach(([key, val]) => {
+        if (val) checklist.push(`equipment:${key}`);
+      });
+    }
+    const eventChecklist = Array.isArray(eventForm.checklistItems)
+      ? eventForm.checklistItems.filter(Boolean)
+      : [];
+    checklist.push(...eventChecklist);
+    return checklist;
+  };
+
+  const formatClientAddress = (client) => {
+    if (!client) return '';
+    const parts = [client.address, client.city, client.zipCode].filter(Boolean);
+    return parts.join(', ');
+  };
+
+  const updateEventForm = (field, value) => {
+    setEventForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const addChecklistItem = () => {
+    const trimmed = checklistInput.trim();
+    if (!trimmed) return;
+    setEventForm((prev) => ({
+      ...prev,
+      checklistItems: [...(prev.checklistItems || []), trimmed],
+    }));
+    setChecklistInput('');
+  };
+
+  const removeChecklistItem = (index) => {
+    setEventForm((prev) => ({
+      ...prev,
+      checklistItems: (prev.checklistItems || []).filter((_, idx) => idx !== index),
+    }));
+  };
+
+  const toggleRecurrenceDay = (day) => {
+    setEventForm((prev) => {
+      const exists = prev.recurrenceDays.includes(day);
+      const next = exists
+        ? prev.recurrenceDays.filter((d) => d !== day)
+        : [...prev.recurrenceDays, day].sort((a, b) => a - b);
+      return { ...prev, recurrenceDays: next };
+    });
+  };
+
+  const fetchClients = async () => {
+    if (!isAdmin || !isAuthenticated) return;
+    setClientsLoading(true);
+    try {
+      const response = await api.get('/users', { params: { role: 'client' } });
+      const list = response.data?.success ? (response.data.data || []) : [];
+      setClients(list);
+    } catch {
+      setClients([]);
+    } finally {
+      setClientsLoading(false);
+    }
+  };
+
+  const fetchCalendarTasks = async () => {
+    if (!isAuthenticated) return;
+    setCalendarLoading(true);
+    try {
+      const params = {};
+      if (isAdmin && selectedClientId) params.clientId = selectedClientId;
+      const response = await api.get('/tasks', { params });
+      const tasks = response.data?.success ? (response.data.data || []) : [];
+      const events = tasks
+        .filter((task) => task.status !== 'cancelled')
+        .map((task) => {
+          const start = new Date(task.date);
+          const [hour, minute] = (task.time || '09:00').split(':').map(Number);
+          start.setHours(hour || 9, minute || 0, 0, 0);
+
+          const end = new Date(start);
+          if (task.endTime) {
+            const [endHour, endMinute] = task.endTime.split(':').map(Number);
+            end.setHours(endHour || hour || 9, endMinute || minute || 0, 0, 0);
+          } else {
+            end.setMinutes(end.getMinutes() + Math.max(30, (task.hours || 1) * 60));
+          }
+
+          return {
+            title: task.title || task.address || task.cleaningType || 'Event',
+            start,
+            end,
+            color: task.status === 'pending' ? colors.warning : colors.primary,
+          };
+        });
+      setCalendarEvents(events);
+    } catch {
+      setCalendarEvents([]);
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
+  const handleSaveNewEvent = () => {
+    setEventError('');
+
+    if (!eventForm.address.trim()) {
+      setEventError(t('client.addressRequired', 'Address is required'));
+      return;
+    }
+
+    if (isAdmin && !selectedClientId) {
+      setEventError(t('admin.pleaseSelectClient', 'Please select a client.'));
+      return;
+    }
+
+    if (!eventForm.allDay && !eventForm.startTime) {
+      setEventError(t('client.timeRequired', 'Start time is required'));
+      return;
+    }
+
+    const [startHour, startMinute] = eventForm.startTime.split(':').map(Number);
+    const [endHour, endMinute] = (eventForm.endTime || eventForm.startTime).split(':').map(Number);
+    const durationHours = eventForm.allDay
+      ? 8
+      : Math.max(0.5, ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60);
+
+    const service = mapServiceFromCleaningType(eventForm.cleaningType);
+
+    setOrder((prev) => ({
+      ...prev,
+      serviceType: service.serviceType,
+      cleaningCategory: service.cleaningCategory,
+      address: eventForm.address.trim(),
+      date: eventForm.date,
+      time: eventForm.allDay ? '09:00' : eventForm.startTime,
+      manualHours: durationHours,
+      comments: eventForm.comments.trim(),
+    }));
+
+    const eventStart = new Date(`${eventForm.date}T${eventForm.allDay ? '09:00' : eventForm.startTime}:00`);
+    const eventEnd = new Date(`${eventForm.date}T${eventForm.allDay ? '17:00' : eventForm.endTime}:00`);
+
+    setCalendarEvents((prev) => ([
+      ...prev,
+      {
+        title: eventForm.title.trim() || eventForm.address.trim(),
+        start: eventStart,
+        end: eventEnd,
+        color: colors.primary,
+      },
+    ]));
+
+    setHasBookingEvent(true);
+    setShowNewEvent(false);
+    setEventForm(DEFAULT_EVENT_FORM);
+    setChecklistInput('');
+  };
+
+  const handleOpenEventModal = () => {
+    setEventError('');
+    setEventForm((prev) => ({
+      ...prev,
+      title: prev.title || order.address || '',
+      date: order.date || prev.date || new Date().toISOString().slice(0, 10),
+      startTime: order.time || prev.startTime || '09:00',
+      endTime: order.time || prev.endTime || '09:30',
+      address: order.address || prev.address,
+      cleaningType: mapCleaningType(order.serviceType, order.cleaningCategory),
+      comments: order.comments || prev.comments,
+    }));
+    setShowNewEvent(true);
+  };
 
   const handleSubmit = async () => {
     if (!order.address.trim()) {
@@ -108,7 +424,59 @@ const NewOrder = ({ navigation }) => {
 
     setSubmitting(true);
     try {
-      const result = await createOrder(order);
+      const payload = {
+        address: order.address || '',
+        date: order.date,
+        time: order.time,
+        hours: estimatedHours,
+        cleaningType: mapCleaningType(order.serviceType, order.cleaningCategory),
+        frequency: 'once',
+        comments: order.comments || '',
+        checklist: buildChecklist(),
+      };
+
+      if (isEditMode) {
+        const taskId = editOrder?.id || editOrder?._id;
+        if (!taskId) {
+          Alert.alert('Error', 'Invalid order id for update');
+          setSubmitting(false);
+          return;
+        }
+
+        await api.put(`/tasks/${taskId}`, payload);
+        Alert.alert('Success', t('orders.orderUpdated', 'Order updated successfully'));
+        navigation.setParams({ editMode: undefined, editOrder: undefined });
+        rootNavigate('MenuTab', { screen: 'PendingOrders' });
+        return;
+      }
+
+      let response;
+      if (isAdmin) {
+        if (!selectedClientId) {
+          Alert.alert('Error', t('admin.pleaseSelectClient', 'Please select a client.'));
+          setSubmitting(false);
+          return;
+        }
+        response = await api.post('/tasks/admin/create', {
+          ...payload,
+          clientId: selectedClientId,
+        });
+      } else {
+        response = await api.post('/tasks', payload);
+      }
+
+      const task = Array.isArray(response.data?.data)
+        ? response.data.data[0]
+        : response.data?.data;
+
+      const result = {
+        ...order,
+        _id: String(task?.id || Date.now()),
+        id: task?.id,
+        status: task?.status || 'pending',
+        calculatedHours: task?.hours || estimatedHours,
+      };
+
       navigation.replace('OrderConfirmation', { order: result });
     } catch (error) {
       Alert.alert('Error', 'Failed to submit order. Please try again.');
@@ -118,14 +486,14 @@ const NewOrder = ({ navigation }) => {
   };
 
   // --- Service type options ---
-  const serviceTypeOptions = [
+  const [serviceTypeOptions, setServiceTypeOptions] = useState([
     { value: 'home', label: t('newOrder.homeCleaning', 'Home Cleaning') },
     { value: 'commercial', label: t('newOrder.commercialCleaning', 'Commercial Cleaning') },
     { value: 'moveinout', label: t('newOrder.moveInOut', 'Move-in/Move-out') },
-  ];
+  ]);
 
   // --- Cleaning category options (only for home) ---
-  const cleaningCategoryOptions = [
+  const [cleaningCategoryOptions, setCleaningCategoryOptions] = useState([
     {
       value: 'standard',
       label: t('newOrder.standardCleaning', 'Standard Cleaning'),
@@ -141,25 +509,27 @@ const NewOrder = ({ navigation }) => {
       label: t('newOrder.adhocCleaning', 'Ad hoc Cleaning'),
       description: t('newOrder.adhocCleaningDesc', 'Custom cleaning based on your selection'),
     },
-  ];
+  ]);
 
   // --- Always included items ---
-  const alwaysIncludedItems = [
+  const [alwaysIncludedItems, setAlwaysIncludedItems] = useState([
     t('newOrder.vacuumCleaning', 'Vacuum cleaning'),
     t('newOrder.floorWashing', 'Floor washing'),
     t('newOrder.wipingSurfaces', 'Wiping surfaces'),
     t('newOrder.bridgeSink', 'Bridge/sink'),
     t('newOrder.bathroom', 'Bathroom, including cleaning toilet and sink (remember plug), mirror and shower'),
     t('newOrder.kitchenSurfaces', 'Kitchen surfaces (no washing up)'),
-  ];
+  ]);
 
   // --- As needed items ---
-  const asNeededItems = [
+  const [asNeededItems, setAsNeededItems] = useState([
     { key: 'wipingFrames', label: t('newOrder.wipingFrames', 'Wiping frames, skirting boards, doors') },
     { key: 'limeShower', label: t('newOrder.limeShower', 'Lime shower cabin and sanitary') },
     { key: 'vacuumFurniture', label: t('newOrder.vacuumFurniture', 'Vacuuming furniture cushions and under cushions') },
     { key: 'cobwebs', label: t('newOrder.cobwebs', 'Cobwebs: walls, ceiling edges and windows') },
-  ];
+  ]);
+  const [newAlwaysIncludedItem, setNewAlwaysIncludedItem] = useState('');
+  const [newAsNeededItem, setNewAsNeededItem] = useState('');
 
   // --- Main cleaning extra items ---
   const mainExtraItems = [
@@ -195,6 +565,176 @@ const NewOrder = ({ navigation }) => {
 
   const isHome = order.serviceType === 'home';
 
+  const updateServiceTypeLabel = (value, label) => {
+    setServiceTypeOptions((prev) => prev.map((item) => (item.value === value ? { ...item, label } : item)));
+  };
+
+  const updateCleaningCategoryField = (value, field, fieldValue) => {
+    setCleaningCategoryOptions((prev) =>
+      prev.map((item) => (item.value === value ? { ...item, [field]: fieldValue } : item))
+    );
+  };
+
+  const updateAlwaysIncludedLabel = (index, label) => {
+    setAlwaysIncludedItems((prev) => prev.map((item, idx) => (idx === index ? label : item)));
+  };
+
+  const updateAsNeededLabel = (key, label) => {
+    setAsNeededItems((prev) => prev.map((item) => (item.key === key ? { ...item, label } : item)));
+  };
+
+  const addAlwaysIncludedItem = () => {
+    const value = newAlwaysIncludedItem.trim();
+    if (!value) return;
+    setAlwaysIncludedItems((prev) => [...prev, value]);
+    setNewAlwaysIncludedItem('');
+  };
+
+  const addAsNeededItem = () => {
+    const value = newAsNeededItem.trim();
+    if (!value) return;
+    const key = `custom_${Date.now()}`;
+    setAsNeededItems((prev) => [...prev, { key, label: value }]);
+    setNewAsNeededItem('');
+  };
+
+  const removeAlwaysIncludedItem = (index) => {
+    setAlwaysIncludedItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const removeAsNeededItem = (key) => {
+    setAsNeededItems((prev) => prev.filter((item) => item.key !== key));
+    setOrder((prev) => ({
+      ...prev,
+      asNeededSelections: prev.asNeededSelections.filter((item) => item !== key),
+    }));
+  };
+
+  const loadOrderConfig = async () => {
+    if (!isAuthenticated) return;
+
+    setConfigLoading(true);
+    try {
+      const response = await api.get('/order-config');
+      const data = response.data?.data;
+
+      if (Array.isArray(data?.serviceTypeOptions) && data.serviceTypeOptions.length) {
+        setServiceTypeOptions(data.serviceTypeOptions);
+      }
+      if (Array.isArray(data?.cleaningCategoryOptions) && data.cleaningCategoryOptions.length) {
+        setCleaningCategoryOptions(data.cleaningCategoryOptions);
+      }
+      if (Array.isArray(data?.alwaysIncludedItems) && data.alwaysIncludedItems.length) {
+        setAlwaysIncludedItems(data.alwaysIncludedItems);
+      }
+      if (Array.isArray(data?.asNeededItems) && data.asNeededItems.length) {
+        setAsNeededItems(data.asNeededItems);
+      }
+    } catch (error) {
+      console.log('Order config fallback to local defaults:', error.message);
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const saveOrderConfig = async () => {
+    if (!isAdmin) return;
+
+    const payload = {
+      serviceTypeOptions,
+      cleaningCategoryOptions,
+      alwaysIncludedItems,
+      asNeededItems,
+    };
+
+    setConfigSaving(true);
+    try {
+      const response = await api.put('/order-config', payload);
+      const data = response.data?.data;
+
+      if (Array.isArray(data?.serviceTypeOptions)) setServiceTypeOptions(data.serviceTypeOptions);
+      if (Array.isArray(data?.cleaningCategoryOptions)) setCleaningCategoryOptions(data.cleaningCategoryOptions);
+      if (Array.isArray(data?.alwaysIncludedItems)) setAlwaysIncludedItems(data.alwaysIncludedItems);
+      if (Array.isArray(data?.asNeededItems)) setAsNeededItems(data.asNeededItems);
+
+      Alert.alert('Success', 'New order options saved successfully');
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to save new order options');
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    loadOrderConfig();
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchClients();
+  }, [isAdmin, isAuthenticated]);
+
+  useEffect(() => {
+    fetchCalendarTasks();
+  }, [isAuthenticated, isAdmin, selectedClientId]);
+
+  useEffect(() => {
+    if (!showNewEvent) return;
+
+    if (isAdmin) {
+      const selectedClient = clients.find((client) => String(client.id || client._id) === String(selectedClientId));
+      const clientAddress = formatClientAddress(selectedClient);
+      setEventForm((prev) => ({ ...prev, address: clientAddress || prev.address }));
+      return;
+    }
+
+    const ownAddress = formatClientAddress(userData);
+    setEventForm((prev) => ({ ...prev, address: ownAddress || prev.address }));
+  }, [showNewEvent, isAdmin, selectedClientId, clients, userData]);
+
+  useEffect(() => {
+    if (!isEditMode || !editOrder) return;
+
+    const hydrated = hydrateOrderFromTask(editOrder);
+    setOrder(hydrated);
+    setHasBookingEvent(Boolean(hydrated.address && hydrated.date && hydrated.time));
+
+    if (isAdmin && editOrder.client?.id) {
+      setSelectedClientId(String(editOrder.client.id));
+    }
+
+    setEventForm((prev) => ({
+      ...prev,
+      title: editOrder.title || editOrder.address || '',
+      date: hydrated.date || prev.date,
+      startTime: hydrated.time || prev.startTime,
+      endTime: hydrated.time || prev.endTime,
+      address: hydrated.address || prev.address,
+      cleaningType: editOrder.cleaningType || prev.cleaningType,
+      checklistItems: (Array.isArray(editOrder.checklist) ? editOrder.checklist : []).filter(
+        (item) => typeof item === 'string' && item && !item.startsWith('equipment:') && item !== 'animalHair' && item !== 'smoking'
+      ),
+      comments: hydrated.comments || prev.comments,
+    }));
+  }, [isEditMode, editOrder, isAdmin]);
+
+  // If not authenticated, show login prompt
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loginPrompt}>
+          <Text style={styles.loginTitle}>{t('orders.loginRequired', 'Login Required')}</Text>
+          <Text style={styles.loginMessage}>
+            {t('orders.loginRequiredMsg', 'Please log in to place a new order.')}
+          </Text>
+          <Button
+            title={t('orders.goToLogin', 'Go to Login')}
+            onPress={() => rootNavigate('MenuTab', { screen: 'Login' })}
+          />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -208,28 +748,88 @@ const NewOrder = ({ navigation }) => {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>{t('newOrder.title', 'New Cleaning Order')}</Text>
+            <Text style={styles.headerTitle}>
+              {isEditMode
+                ? t('orders.editPendingOrder', 'Edit Pending Order')
+                : t('newOrder.title', 'New Cleaning Order')}
+            </Text>
+            {configLoading ? <Text style={styles.configHint}>Loading saved options...</Text> : null}
+            {isAdmin ? (
+              <Button
+                title={configSaving ? 'Saving options...' : 'Save Options'}
+                onPress={saveOrderConfig}
+                variant="secondary"
+                loading={configSaving}
+                disabled={configSaving}
+                style={styles.saveOptionsButton}
+              />
+            ) : null}
           </View>
 
           {/* Section A: Service Type */}
-          <SectionCard title={t('newOrder.serviceType', 'Service Type')}>
+          <SectionCard
+            title={t('newOrder.serviceType', 'Service Type')}
+            collapsible
+            defaultExpanded={false}
+          >
             <RadioGroup
               options={serviceTypeOptions}
               selectedValue={order.serviceType}
               onChange={(val) => updateOrder('serviceType', val)}
             />
+
+            {isAdmin && (
+              <View style={styles.adminEditorWrap}>
+                <Text style={styles.adminEditorTitle}>Admin: Edit Service Type Labels</Text>
+                {serviceTypeOptions.map((option) => (
+                  <TextInput
+                    key={`st-${option.value}`}
+                    style={styles.input}
+                    value={option.label}
+                    onChangeText={(val) => updateServiceTypeLabel(option.value, val)}
+                    placeholder="Service type label"
+                  />
+                ))}
+              </View>
+            )}
           </SectionCard>
 
           {/* Home cleaning specific sections */}
           {isHome && (
             <>
               {/* Section B: Cleaning Category */}
-              <SectionCard title={t('newOrder.cleaningCategory', 'Cleaning Category')}>
+              <SectionCard
+                title={t('newOrder.cleaningCategory', 'Cleaning Category')}
+                collapsible
+                defaultExpanded={false}
+              >
                 <RadioGroup
                   options={cleaningCategoryOptions}
                   selectedValue={order.cleaningCategory}
                   onChange={(val) => updateOrder('cleaningCategory', val)}
                 />
+
+                {isAdmin && (
+                  <View style={styles.adminEditorWrap}>
+                    <Text style={styles.adminEditorTitle}>Admin: Edit Cleaning Category Content</Text>
+                    {cleaningCategoryOptions.map((option) => (
+                      <View key={`cc-${option.value}`} style={styles.adminEditorBlock}>
+                        <TextInput
+                          style={styles.input}
+                          value={option.label}
+                          onChangeText={(val) => updateCleaningCategoryField(option.value, 'label', val)}
+                          placeholder="Category label"
+                        />
+                        <TextInput
+                          style={styles.input}
+                          value={option.description || ''}
+                          onChangeText={(val) => updateCleaningCategoryField(option.value, 'description', val)}
+                          placeholder="Category description"
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
               </SectionCard>
 
               {/* Standard cleaning checklist */}
@@ -239,14 +839,46 @@ const NewOrder = ({ navigation }) => {
                   <SectionCard
                     title={t('newOrder.alwaysIncluded', 'Always Included')}
                     description={t('newOrder.alwaysIncludedDesc', 'These tasks are always performed')}
+                    collapsible
+                    defaultExpanded={false}
                   >
-                    {alwaysIncludedItems.map((item, index) => (
-                      <Checkbox
-                        key={index}
-                        label={item}
-                        alwaysChecked
-                      />
-                    ))}
+                    {alwaysIncludedItems.map((item, index) => {
+                      if (isAdmin) {
+                        return (
+                          <View key={`ai-edit-${index}`} style={styles.adminEditableRow}>
+                            <TextInput
+                              style={[styles.input, styles.adminEditableInput]}
+                              value={item}
+                              onChangeText={(val) => updateAlwaysIncludedLabel(index, val)}
+                              placeholder="Always included item"
+                            />
+                            <TouchableOpacity style={styles.deleteBtn} onPress={() => removeAlwaysIncludedItem(index)}>
+                              <Text style={styles.deleteBtnText}>Delete</Text>
+                            </TouchableOpacity>
+                          </View>
+                        );
+                      }
+
+                      return (
+                        <Checkbox
+                          key={index}
+                          label={item}
+                          alwaysChecked
+                        />
+                      );
+                    })}
+
+                    {isAdmin && (
+                      <View style={styles.adminAddRow}>
+                        <TextInput
+                          style={[styles.input, styles.adminAddInput]}
+                          value={newAlwaysIncludedItem}
+                          onChangeText={setNewAlwaysIncludedItem}
+                          placeholder="Add always included item"
+                        />
+                        <Button title="Add" onPress={addAlwaysIncludedItem} variant="secondary" />
+                      </View>
+                    )}
                   </SectionCard>
 
                   {/* As needed — only for Standard */}
@@ -254,17 +886,45 @@ const NewOrder = ({ navigation }) => {
                     <SectionCard
                       title={t('newOrder.asNeeded', 'As Needed')}
                       description={t('newOrder.asNeededDesc', 'Select additional tasks you want done')}
+                      collapsible
+                      defaultExpanded={false}
                     >
                       {asNeededItems.map((item) => (
-                        <Checkbox
-                          key={item.key}
-                          label={item.label}
-                          checked={order.asNeededSelections.includes(item.key)}
-                          onChange={() => toggleAsNeeded(item.key)}
-                        />
+                        <View key={item.key} style={styles.asNeededRow}>
+                          <Checkbox
+                            label={item.label}
+                            checked={order.asNeededSelections.includes(item.key)}
+                            onChange={() => toggleAsNeeded(item.key)}
+                          />
+                          {isAdmin && (
+                            <View style={styles.adminEditableRow}>
+                              <TextInput
+                                style={[styles.input, styles.adminEditableInput]}
+                                value={item.label}
+                                onChangeText={(val) => updateAsNeededLabel(item.key, val)}
+                                placeholder="As needed label"
+                              />
+                              <TouchableOpacity style={styles.deleteBtn} onPress={() => removeAsNeededItem(item.key)}>
+                                <Text style={styles.deleteBtnText}>Delete</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
                       ))}
+
+                      {isAdmin && (
+                        <View style={styles.adminAddRow}>
+                          <TextInput
+                            style={[styles.input, styles.adminAddInput]}
+                            value={newAsNeededItem}
+                            onChangeText={setNewAsNeededItem}
+                            placeholder="Add as needed item"
+                          />
+                          <Button title="Add" onPress={addAsNeededItem} variant="secondary" />
+                        </View>
+                      )}
                       {/* Cleaner reminders */}
-                      {order.asNeededSelections.length > 0 && (
+                      {isCleaner && order.asNeededSelections.length > 0 && (
                         <InfoBox
                           title={t('newOrder.cleanerReminders', 'Reminders for Cleaner')}
                           type="warning"
@@ -283,6 +943,8 @@ const NewOrder = ({ navigation }) => {
                       <SectionCard
                         title={t('newOrder.mainCleaningExtras', 'Main Cleaning — Additional Tasks')}
                         description={t('newOrder.mainCleaningExtrasDesc', 'All standard items plus these extra tasks')}
+                        collapsible
+                        defaultExpanded={false}
                       >
                         {mainExtraItems.map((item) => (
                           <Checkbox
@@ -295,7 +957,11 @@ const NewOrder = ({ navigation }) => {
                       </SectionCard>
 
                       {/* Home size — Main cleaning */}
-                      <SectionCard title={t('newOrder.homeSize', 'Home Size')}>
+                      <SectionCard
+                        title={t('newOrder.homeSize', 'Home Size')}
+                        collapsible
+                        defaultExpanded={false}
+                      >
                         <RadioGroup
                           options={homeSizeOptions}
                           selectedValue={order.homeSize}
@@ -312,6 +978,8 @@ const NewOrder = ({ navigation }) => {
                 <SectionCard
                   title={t('newOrder.adhocOptions', 'Ad hoc Cleaning Options')}
                   description={t('newOrder.adhocOptionsDesc', 'Select the cleaning you need')}
+                  collapsible
+                  defaultExpanded={false}
                 >
                   {adhocPredefined.map((item) => (
                     <Checkbox
@@ -381,6 +1049,8 @@ const NewOrder = ({ navigation }) => {
               title={order.serviceType === 'commercial'
                 ? t('newOrder.commercialCleaning', 'Commercial Cleaning')
                 : t('newOrder.moveInOut', 'Move-in/Move-out')}
+              collapsible
+              defaultExpanded={false}
             >
               <Text style={styles.inputLabel}>
                 {order.serviceType === 'commercial'
@@ -459,33 +1129,98 @@ const NewOrder = ({ navigation }) => {
           </SectionCard>
 
           {/* Section H: Booking Details */}
-          <SectionCard title={t('newOrder.bookingDetails', 'Booking Details')}>
-            <Text style={styles.inputLabel}>{t('newOrder.address', 'Address')} *</Text>
-            <TextInput
-              style={styles.input}
-              value={order.address}
-              onChangeText={(val) => updateOrder('address', val)}
-              placeholder={t('newOrder.addressPlaceholder', 'Enter your address')}
-              placeholderTextColor={colors.gray[400]}
-            />
+          <SectionCard
+            title={t('newOrder.bookingDetails', 'Booking Details')}
+            collapsible
+            defaultExpanded={false}
+          >
+            {isAdmin ? (
+              <>
+                <Text style={styles.inputLabel}>{t('admin.client', 'Client')}</Text>
+                <View style={styles.clientPickerWrap}>
+                  <Picker selectedValue={selectedClientId} onValueChange={(value) => setSelectedClientId(value)}>
+                    <Picker.Item label={clientsLoading ? 'Loading clients...' : t('admin.allClients', 'All clients')} value="" />
+                    {clients.map((client) => (
+                      <Picker.Item
+                        key={String(client.id || client._id)}
+                        label={`${client.name}${client.email ? ` (${client.email})` : ''}`}
+                        value={String(client.id || client._id)}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+              </>
+            ) : null}
 
-            <Text style={styles.inputLabel}>{t('newOrder.preferredDate', 'Preferred Date')} *</Text>
-            <TextInput
-              style={styles.input}
-              value={order.date}
-              onChangeText={(val) => updateOrder('date', val)}
-              placeholder={t('newOrder.datePlaceholder', 'YYYY-MM-DD')}
-              placeholderTextColor={colors.gray[400]}
-            />
+            <View style={styles.calendarToolbar}>
+              <View style={styles.calendarModes}>
+                {['month', 'week', 'day'].map((mode) => (
+                  <TouchableOpacity
+                    key={mode}
+                    style={[styles.modeBtn, calendarMode === mode && styles.modeBtnActive]}
+                    onPress={() => setCalendarMode(mode)}
+                  >
+                    <Text style={[styles.modeBtnText, calendarMode === mode && styles.modeBtnTextActive]}>
+                      {mode}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Button
+                title={hasBookingEvent || isEditMode ? t('scheduling.editEvent', 'Edit event') : t('scheduling.newEvent', 'New event')}
+                onPress={handleOpenEventModal}
+                variant="primary"
+              />
+            </View>
 
-            <Text style={styles.inputLabel}>{t('newOrder.preferredTime', 'Preferred Time')} *</Text>
-            <TextInput
-              style={styles.input}
-              value={order.time}
-              onChangeText={(val) => updateOrder('time', val)}
-              placeholder={t('newOrder.timePlaceholder', 'HH:MM')}
-              placeholderTextColor={colors.gray[400]}
-            />
+            {isEditMode ? (
+              <View style={styles.editDateTimeWrap}>
+                <Text style={styles.editDateTimeHint}>
+                  {t('orders.editDateTimeHint', 'To change pending booking date/time, open event editor and update start date and start time.')}
+                </Text>
+                <Button
+                  title={t('orders.editDateTime', 'Edit Date & Time')}
+                  onPress={handleOpenEventModal}
+                  variant="secondary"
+                />
+              </View>
+            ) : null}
+
+            <View style={styles.calendarCard}>
+              {calendarLoading ? (
+                <Text style={styles.calendarPlaceholder}>{t('common.loading', 'Loading...')}</Text>
+              ) : (
+                <Calendar
+                  events={calendarEvents}
+                  mode={calendarMode}
+                  height={isNarrowScreen ? 360 : 420}
+                  weekStartsOn={1}
+                />
+              )}
+            </View>
+
+            <View style={styles.calendarClientInfo}>
+              <Text style={styles.calendarClientLabel}>{t('admin.client', 'Client')}</Text>
+              <Text style={styles.calendarClientValue}>
+                {isAdmin
+                  ? (selectedClientId
+                    ? (clients.find((client) => String(client.id || client._id) === String(selectedClientId))?.name || t('admin.allClients', 'All clients'))
+                    : t('admin.allClients', 'All clients'))
+                  : t('scheduling.mySchedule', 'My Schedule')}
+              </Text>
+            </View>
+
+            {!hasBookingEvent ? (
+              <Text style={styles.bookingHintText}>
+                {t('scheduling.pickEventHint', 'Create a new event to fill booking details before submitting.')}
+              </Text>
+            ) : (
+              <View style={styles.bookingSummary}>
+                <Text style={styles.bookingSummaryTitle}>{t('newOrder.bookingDetails', 'Booking Details')}</Text>
+                <Text style={styles.bookingSummaryItem}>{order.address}</Text>
+                <Text style={styles.bookingSummaryItem}>{order.date} {order.time}</Text>
+              </View>
+            )}
 
             {/* Calculated hours display */}
             <View style={styles.hoursDisplay}>
@@ -508,10 +1243,343 @@ const NewOrder = ({ navigation }) => {
             />
           </SectionCard>
 
+          <Modal
+            visible={showNewEvent}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowNewEvent(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalCard, { width: modalWidth }]}> 
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>{t('scheduling.newEvent', 'New event')}</Text>
+                  <TouchableOpacity onPress={() => setShowNewEvent(false)}>
+                    <Text style={styles.modalClose}>×</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+                  <Text style={styles.inputLabel}>{t('scheduling.title', 'Title')}</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={eventForm.title}
+                    onChangeText={(value) => updateEventForm('title', value)}
+                    placeholder={t('scheduling.titlePlaceholder', 'e.g. Cleaning service')}
+                  />
+
+                  {isAdmin ? (
+                    <>
+                      <Text style={styles.inputLabel}>{t('admin.client', 'Client')} *</Text>
+                      <View style={styles.clientPickerWrap}>
+                        <Picker
+                          selectedValue={selectedClientId}
+                          onValueChange={(value) => {
+                            setSelectedClientId(value);
+                            const selectedClient = clients.find((client) => String(client.id || client._id) === String(value));
+                            updateEventForm('address', formatClientAddress(selectedClient));
+                          }}
+                        >
+                          <Picker.Item label={t('admin.chooseClient', 'Choose a client...')} value="" />
+                          {clients.map((client) => (
+                            <Picker.Item
+                              key={String(client.id || client._id)}
+                              label={`${client.name}${client.email ? ` (${client.email})` : ''}`}
+                              value={String(client.id || client._id)}
+                            />
+                          ))}
+                        </Picker>
+                      </View>
+                    </>
+                  ) : null}
+
+                  <Text style={styles.inputLabel}>{t('scheduling.startDate', 'Start date')} *</Text>
+                  {isWeb ? (
+                    <input
+                      style={webInputStyle}
+                      value={eventForm.date}
+                      onChange={(event) => updateEventForm('date', event.target.value)}
+                      type="date"
+                    />
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={styles.nativePickerBtn}
+                        onPress={() => setShowNativeDatePicker(true)}
+                      >
+                        <Text style={eventForm.date ? styles.nativePickerText : styles.nativePickerPlaceholder}>
+                          {eventForm.date ? new Date(eventForm.date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'Select date...'}
+                        </Text>
+                        <Text style={styles.nativePickerIcon}>📅</Text>
+                      </TouchableOpacity>
+                      {showNativeDatePicker && (
+                        <DateTimePicker
+                          value={eventForm.date ? new Date(eventForm.date + 'T00:00:00') : new Date()}
+                          mode="date"
+                          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                          onChange={(event, selectedDate) => {
+                            setShowNativeDatePicker(Platform.OS === 'ios');
+                            if (selectedDate) {
+                              const yyyy = selectedDate.getFullYear();
+                              const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                              const dd = String(selectedDate.getDate()).padStart(2, '0');
+                              updateEventForm('date', `${yyyy}-${mm}-${dd}`);
+                            }
+                          }}
+                        />
+                      )}
+                      {showNativeDatePicker && Platform.OS === 'ios' && (
+                        <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowNativeDatePicker(false)}>
+                          <Text style={styles.pickerDoneBtnText}>Done</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
+
+                  <View style={[styles.timeRow, (isNarrowScreen || isWeb) && styles.timeRowStack]}>
+                    <View style={styles.timeCol}>
+                      <Text style={styles.inputLabel}>{t('scheduling.startTime', 'Start time')}</Text>
+                      {isWeb ? (
+                        <input
+                          style={webInputStyle}
+                          value={eventForm.startTime}
+                          onChange={(event) => updateEventForm('startTime', event.target.value)}
+                          type="time"
+                        />
+                      ) : (
+                        <>
+                          <TouchableOpacity
+                            style={styles.nativePickerBtn}
+                            onPress={() => setShowNativeStartTimePicker(true)}
+                          >
+                            <Text style={eventForm.startTime ? styles.nativePickerText : styles.nativePickerPlaceholder}>
+                              {eventForm.startTime || 'Select time...'}
+                            </Text>
+                            <Text style={styles.nativePickerIcon}>🕐</Text>
+                          </TouchableOpacity>
+                          {showNativeStartTimePicker && (
+                            <DateTimePicker
+                              value={(() => { const [h, m] = (eventForm.startTime || '09:00').split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m), 0); return d; })()}
+                              mode="time"
+                              is24Hour={true}
+                              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                              onChange={(event, selectedTime) => {
+                                setShowNativeStartTimePicker(Platform.OS === 'ios');
+                                if (selectedTime) {
+                                  const hh = String(selectedTime.getHours()).padStart(2, '0');
+                                  const mm = String(selectedTime.getMinutes()).padStart(2, '0');
+                                  updateEventForm('startTime', `${hh}:${mm}`);
+                                }
+                              }}
+                            />
+                          )}
+                          {showNativeStartTimePicker && Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowNativeStartTimePicker(false)}>
+                              <Text style={styles.pickerDoneBtnText}>Done</Text>
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      )}
+                    </View>
+                    <View style={styles.timeCol}>
+                      <Text style={styles.inputLabel}>{t('scheduling.endTime', 'End time')}</Text>
+                      {isWeb ? (
+                        <input
+                          style={webInputStyle}
+                          value={eventForm.endTime}
+                          onChange={(event) => updateEventForm('endTime', event.target.value)}
+                          type="time"
+                        />
+                      ) : (
+                        <>
+                          <TouchableOpacity
+                            style={styles.nativePickerBtn}
+                            onPress={() => setShowNativeEndTimePicker(true)}
+                          >
+                            <Text style={eventForm.endTime ? styles.nativePickerText : styles.nativePickerPlaceholder}>
+                              {eventForm.endTime || 'Select time...'}
+                            </Text>
+                            <Text style={styles.nativePickerIcon}>🕐</Text>
+                          </TouchableOpacity>
+                          {showNativeEndTimePicker && (
+                            <DateTimePicker
+                              value={(() => { const [h, m] = (eventForm.endTime || '09:30').split(':'); const d = new Date(); d.setHours(parseInt(h), parseInt(m), 0); return d; })()}
+                              mode="time"
+                              is24Hour={true}
+                              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                              onChange={(event, selectedTime) => {
+                                setShowNativeEndTimePicker(Platform.OS === 'ios');
+                                if (selectedTime) {
+                                  const hh = String(selectedTime.getHours()).padStart(2, '0');
+                                  const mm = String(selectedTime.getMinutes()).padStart(2, '0');
+                                  updateEventForm('endTime', `${hh}:${mm}`);
+                                }
+                              }}
+                            />
+                          )}
+                          {showNativeEndTimePicker && Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowNativeEndTimePicker(false)}>
+                              <Text style={styles.pickerDoneBtnText}>Done</Text>
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      )}
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.checkRow} onPress={() => updateEventForm('allDay', !eventForm.allDay)}>
+                    <View style={[styles.checkBox, eventForm.allDay && styles.checkBoxActive]} />
+                    <Text style={styles.checkLabel}>{t('scheduling.allDay', 'All day')}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.checkRow} onPress={() => updateEventForm('recurring', !eventForm.recurring)}>
+                    <View style={[styles.checkBox, eventForm.recurring && styles.checkBoxActive]} />
+                    <Text style={styles.checkLabel}>{t('scheduling.recurring', 'Recurring')}</Text>
+                  </TouchableOpacity>
+
+                  {eventForm.recurring ? (
+                    <View style={styles.recurringWrap}>
+                      <Text style={styles.inputLabel}>{t('scheduling.repeatEvery', 'Repeat every')}</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={String(eventForm.recurrenceEvery)}
+                        onChangeText={(value) => updateEventForm('recurrenceEvery', Math.max(1, parseInt(value || '1', 10)))}
+                        keyboardType="numeric"
+                      />
+                      <Text style={styles.inputLabel}>{t('scheduling.onDays', 'On days')}</Text>
+                      <View style={styles.weekdayRow}>
+                        {WEEKDAYS.map((day) => (
+                          <TouchableOpacity
+                            key={day.value}
+                            style={[styles.weekdayBtn, eventForm.recurrenceDays.includes(day.value) && styles.weekdayBtnActive]}
+                            onPress={() => toggleRecurrenceDay(day.value)}
+                          >
+                            <Text style={[styles.weekdayText, eventForm.recurrenceDays.includes(day.value) && styles.weekdayTextActive]}>{day.short}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                      <Text style={styles.inputLabel}>{t('scheduling.untilDate', 'Until date')}</Text>
+                      {isWeb ? (
+                        <input
+                          style={webInputStyle}
+                          value={eventForm.recurrenceUntil}
+                          onChange={(event) => updateEventForm('recurrenceUntil', event.target.value)}
+                          type="date"
+                        />
+                      ) : (
+                        <>
+                          <TouchableOpacity
+                            style={styles.nativePickerBtn}
+                            onPress={() => setShowNativeUntilDatePicker(true)}
+                          >
+                            <Text style={eventForm.recurrenceUntil ? styles.nativePickerText : styles.nativePickerPlaceholder}>
+                              {eventForm.recurrenceUntil ? new Date(eventForm.recurrenceUntil + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : 'Select end date...'}
+                            </Text>
+                            <Text style={styles.nativePickerIcon}>📅</Text>
+                          </TouchableOpacity>
+                          {showNativeUntilDatePicker && (
+                            <DateTimePicker
+                              value={eventForm.recurrenceUntil ? new Date(eventForm.recurrenceUntil + 'T00:00:00') : new Date()}
+                              mode="date"
+                              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                              onChange={(event, selectedDate) => {
+                                setShowNativeUntilDatePicker(Platform.OS === 'ios');
+                                if (selectedDate) {
+                                  const yyyy = selectedDate.getFullYear();
+                                  const mm = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                                  const dd = String(selectedDate.getDate()).padStart(2, '0');
+                                  updateEventForm('recurrenceUntil', `${yyyy}-${mm}-${dd}`);
+                                }
+                              }}
+                            />
+                          )}
+                          {showNativeUntilDatePicker && Platform.OS === 'ios' && (
+                            <TouchableOpacity style={styles.pickerDoneBtn} onPress={() => setShowNativeUntilDatePicker(false)}>
+                              <Text style={styles.pickerDoneBtnText}>Done</Text>
+                            </TouchableOpacity>
+                          )}
+                        </>
+                      )}
+                    </View>
+                  ) : null}
+
+                  <Text style={styles.inputLabel}>{t('auth.address', 'Address')} *</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={eventForm.address}
+                    placeholder={t('newOrder.addressPlaceholder', 'Enter your address')}
+                    editable={false}
+                  />
+
+                  <Text style={styles.inputLabel}>{t('client.cleaningType', 'Cleaning Type')}</Text>
+                  <View style={styles.clientPickerWrap}>
+                    <Picker
+                      selectedValue={eventForm.cleaningType}
+                      onValueChange={(value) => updateEventForm('cleaningType', value)}
+                    >
+                      <Picker.Item label={t('client.residential', 'Residential')} value="residential" />
+                      <Picker.Item label={t('client.commercial', 'Commercial')} value="commercial" />
+                      <Picker.Item label={t('client.deep', 'Deep Cleaning')} value="deep" />
+                      <Picker.Item label={t('client.move', 'Move-in/Move-out')} value="move" />
+                    </Picker>
+                  </View>
+
+                  <Text style={styles.inputLabel}>{t('client.whatNeedsToBeDone', 'What needs to be done')}</Text>
+                  <View style={styles.checklistInputRow}>
+                    <TextInput
+                      style={[styles.input, styles.checklistInput]}
+                      value={checklistInput}
+                      onChangeText={setChecklistInput}
+                      placeholder={t('client.checklistPlaceholder', 'e.g. Kitchen cleaning, Bathroom deep clean...')}
+                      onSubmitEditing={addChecklistItem}
+                    />
+                    <TouchableOpacity
+                      style={[styles.addChecklistBtn, !checklistInput.trim() && styles.addChecklistBtnDisabled]}
+                      onPress={addChecklistItem}
+                      disabled={!checklistInput.trim()}
+                    >
+                      <Text style={styles.addChecklistBtnText}>+ Add</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {(eventForm.checklistItems || []).length > 0 ? (
+                    <View style={styles.checklistListWrap}>
+                      {(eventForm.checklistItems || []).map((item, index) => (
+                        <View key={`check-item-${index}`} style={styles.checklistItemRow}>
+                          <Text style={styles.checklistTick}>✓</Text>
+                          <Text style={styles.checklistItemText}>{item}</Text>
+                          <TouchableOpacity onPress={() => removeChecklistItem(index)} style={styles.removeChecklistBtn}>
+                            <Text style={styles.removeChecklistBtnText}>×</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <Text style={styles.inputLabel}>{t('client.comments', 'Comments')}</Text>
+                  <TextInput
+                    style={styles.textArea}
+                    value={eventForm.comments}
+                    onChangeText={(value) => updateEventForm('comments', value)}
+                    multiline
+                    numberOfLines={3}
+                  />
+
+                  {eventError ? <Text style={styles.eventError}>{eventError}</Text> : null}
+
+                  <View style={styles.modalActions}>
+                    <Button title={t('scheduling.saveEvent', 'Save')} onPress={handleSaveNewEvent} variant="primary" />
+                    <Button title={t('common.cancel', 'Cancel')} onPress={() => setShowNewEvent(false)} variant="secondary" />
+                  </View>
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
           {/* Submit */}
           <View style={styles.submitContainer}>
             <Button
-              title={submitting ? t('newOrder.submitting', 'Submitting...') : t('newOrder.submitOrder', 'Submit Order')}
+              title={submitting
+                ? t('newOrder.submitting', 'Submitting...')
+                : (isEditMode ? t('orders.saveChanges', 'Save Changes') : t('newOrder.submitOrder', 'Submit Order'))}
               onPress={handleSubmit}
               disabled={submitting}
               loading={submitting}
@@ -539,6 +1607,15 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: spacing.md,
+  },
+  saveOptionsButton: {
+    marginTop: spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  configHint: {
+    marginTop: spacing.xs,
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
   },
   headerTitle: {
     fontSize: typography.fontSize.xxl,
@@ -569,6 +1646,55 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray[200],
     marginVertical: spacing.sm,
   },
+  adminEditorWrap: {
+    marginTop: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[200],
+  },
+  adminEditorTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primaryDark,
+    marginBottom: spacing.sm,
+  },
+  adminEditorBlock: {
+    marginBottom: spacing.sm,
+  },
+  adminAddRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  adminAddInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  adminEditableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  adminEditableInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  deleteBtn: {
+    backgroundColor: colors.error,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  deleteBtnText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  asNeededRow: {
+    marginBottom: spacing.sm,
+  },
   inputLabel: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
@@ -585,6 +1711,41 @@ const styles = StyleSheet.create({
     color: colors.text,
     backgroundColor: colors.white,
     marginBottom: spacing.sm,
+  },
+  nativePickerBtn: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    padding: spacing.sm + 2,
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
+  },
+  nativePickerText: {
+    fontSize: typography.fontSize.md,
+    color: colors.text,
+  },
+  nativePickerPlaceholder: {
+    fontSize: typography.fontSize.md,
+    color: colors.textLight,
+  },
+  nativePickerIcon: {
+    fontSize: 18,
+  },
+  pickerDoneBtn: {
+    alignSelf: 'flex-end',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.sm,
+  },
+  pickerDoneBtnText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
   },
   smallInput: {
     borderWidth: 1,
@@ -637,6 +1798,288 @@ const styles = StyleSheet.create({
   },
   submitContainer: {
     marginTop: spacing.md,
+  },
+  clientPickerWrap: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
+  },
+  calendarToolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    marginBottom: spacing.sm,
+    gap: spacing.sm,
+    width: '100%',
+  },
+  calendarModes: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    maxWidth: '100%',
+  },
+  modeBtn: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.white,
+  },
+  modeBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  modeBtnText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textDark,
+    textTransform: 'capitalize',
+  },
+  modeBtnTextActive: {
+    color: colors.primaryDark,
+    fontWeight: typography.fontWeight.bold,
+  },
+  calendarCard: {
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  calendarPlaceholder: {
+    padding: spacing.md,
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+  },
+  calendarClientInfo: {
+    marginBottom: spacing.sm,
+  },
+  calendarClientLabel: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textLight,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  calendarClientValue: {
+    fontSize: typography.fontSize.md,
+    color: colors.textDark,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  bookingHintText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.warning,
+    marginBottom: spacing.sm,
+  },
+  editDateTimeWrap: {
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  editDateTimeHint: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+  },
+  bookingSummary: {
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.white,
+    padding: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  bookingSummaryTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.primaryDark,
+    marginBottom: spacing.xs,
+  },
+  bookingSummaryItem: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textDark,
+    marginBottom: 2,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.md,
+  },
+  modalCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    maxHeight: '90%',
+    alignSelf: 'center',
+    overflow: 'hidden',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[200],
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+  },
+  modalClose: {
+    fontSize: 24,
+    color: colors.textLight,
+  },
+  modalBody: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    width: '100%',
+  },
+  timeRowStack: {
+    flexDirection: 'column',
+    gap: 0,
+  },
+  timeCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  checkBox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: 4,
+    marginRight: spacing.sm,
+    backgroundColor: colors.white,
+  },
+  checkBoxActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkLabel: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textDark,
+  },
+  recurringWrap: {
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.gray[50],
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  weekdayBtn: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.white,
+  },
+  weekdayBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
+  },
+  weekdayText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textDark,
+  },
+  weekdayTextActive: {
+    color: colors.primaryDark,
+    fontWeight: typography.fontWeight.bold,
+  },
+  eventError: {
+    color: colors.error,
+    fontSize: typography.fontSize.sm,
+    marginBottom: spacing.sm,
+  },
+  checklistInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  checklistInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  addChecklistBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  addChecklistBtnDisabled: {
+    opacity: 0.5,
+  },
+  addChecklistBtnText: {
+    color: colors.white,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  checklistListWrap: {
+    marginBottom: spacing.sm,
+  },
+  checklistItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  checklistTick: {
+    color: colors.secondary,
+    marginRight: spacing.xs,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
+  checklistItemText: {
+    flex: 1,
+    color: colors.textDark,
+    fontSize: typography.fontSize.sm,
+  },
+  removeChecklistBtn: {
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  removeChecklistBtnText: {
+    color: colors.error,
+    fontSize: typography.fontSize.lg,
+    lineHeight: 20,
+  },
+  modalActions: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
 });
 

@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, createContext, useContext } from 'react';
+import React, { useEffect, useRef, createContext, useContext, useState, useCallback } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { useWindowDimensions } from 'react-native';
+import { useWindowDimensions, View, ActivityIndicator } from 'react-native';
 
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,6 @@ import 'react-native-reanimated';
 import { LanguageProvider } from './src/contexts/LanguageContext';
 import { ToastProvider } from './src/contexts/ToastContext';
 import { AuthProvider } from './src/contexts/AuthContext';
-import { initMockData } from './src/utils/mockData';
 import ErrorBoundary from './src/components/Common/ErrorBoundary';
 import ErrorDisplay, { logError, logConsole } from './src/components/Common/ErrorDisplay';
 
@@ -63,40 +62,33 @@ try {
 }
 
 // Main Screens
-import HomePage from './src/screens/HomePage/HomePage';
-import Services from './src/screens/Services/Services';
-import PrivateCleaning from './src/screens/Services/PrivateCleaning';
-import CommercialCleaning from './src/screens/Services/CommercialCleaning';
-import MoveInMoveOut from './src/screens/Services/MoveInMoveOut';
 import About from './src/screens/About/About';
 import Contact from './src/screens/Contact/Contact';
-import Careers from './src/screens/Careers/Careers';
 
 // Auth Screens
 import Login from './src/screens/Auth/Login';
 import Register from './src/screens/Auth/Register';
+import ForgotPassword from './src/screens/Auth/ForgotPassword';
+import ResetPassword from './src/screens/Auth/ResetPassword';
 
-// Dashboard Screens
-import ClientDashboard from './src/screens/Dashboards/ClientDashboard/ClientDashboard';
-import AdminDashboard from './src/screens/Dashboards/AdminDashboard/AdminDashboard';
-import CleanerDashboard from './src/screens/Dashboards/CleanerDashboard/CleanerDashboard';
 import MenuScreen from './src/screens/Menu/Menu';
 import ChatScreen from './src/screens/Chat/ChatScreen';
+import AdminDashboard from './src/screens/Dashboards/AdminDashboard/AdminDashboard';
 
 // Order Screens
 import NewOrder from './src/screens/Orders/NewOrder';
 import OrderConfirmation from './src/screens/Orders/OrderConfirmation';
 import ConfirmedOrders from './src/screens/Orders/ConfirmedOrders';
-import OrderDetail from './src/screens/Orders/OrderDetail';
+import OrderDetail from './src/screens/Orders/OrderDetail.js';
 import PendingOrders from './src/screens/Orders/PendingOrders';
 import ArchiveOrders from './src/screens/Orders/ArchiveOrders';
 
 // Profile Screen
 import ProfileScreen from './src/screens/Profile/ProfileScreen';
 
-// Protected Route Component
-import ProtectedRoute from './src/components/Auth/ProtectedRoute';
 import { navigationRef } from './src/utils/rootNavigation';
+import { useAuth } from './src/contexts/AuthContext';
+import api from './src/utils/api';
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -104,6 +96,32 @@ const RootNavigationContext = createContext(navigationRef);
 
 export function useRootNavigation() {
   return useContext(RootNavigationContext) || navigationRef;
+}
+
+// Hook to poll unread chat count
+function useUnreadCount() {
+  const { isAuthenticated } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const response = await api.get('/chat/unread-count');
+      if (response.data?.success) {
+        setUnreadCount(response.data.data.count || 0);
+      }
+    } catch {
+      // silent - don't disrupt the app if chat endpoint isn't ready
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) { setUnreadCount(0); return; }
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000); // poll every 15s
+    return () => clearInterval(interval);
+  }, [isAuthenticated, fetchUnread]);
+
+  return unreadCount;
 }
 
 function OrdersStack() {
@@ -136,6 +154,21 @@ function NewOrderStack() {
   );
 }
 
+function PendingStack() {
+  return (
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: '#00AEEF' },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: 'bold' },
+      }}
+    >
+      <Stack.Screen name="PendingOrders" component={PendingOrders} options={{ headerShown: false }} />
+      <Stack.Screen name="OrderDetail" component={OrderDetail} options={{ title: 'Order Details' }} />
+    </Stack.Navigator>
+  );
+}
+
 function MenuStack() {
   return (
     <Stack.Navigator
@@ -146,36 +179,26 @@ function MenuStack() {
       }}
     >
       <Stack.Screen name="MenuScreen" component={MenuScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="AdminDashboard" component={AdminDashboard} options={{ title: 'Admin', headerStyle: { backgroundColor: '#00AEEF' }, headerTintColor: '#fff' }} />
       <Stack.Screen name="About" component={About} options={{ title: 'About Us' }} />
       <Stack.Screen name="Contact" component={Contact} options={{ title: 'Contact Us' }} />
-      <Stack.Screen name="Careers" component={Careers} options={{ title: 'Careers' }} />
-      <Stack.Screen name="Services" component={Services} options={{ title: 'Services' }} />
-      <Stack.Screen name="PrivateCleaning" component={PrivateCleaning} options={{ title: 'Private Cleaning' }} />
-      <Stack.Screen name="CommercialCleaning" component={CommercialCleaning} options={{ title: 'Commercial Cleaning' }} />
-      <Stack.Screen name="MoveInMoveOut" component={MoveInMoveOut} options={{ title: 'Move-in/Move-out' }} />
       <Stack.Screen name="PendingOrders" component={PendingOrders} options={{ title: 'Pending' }} />
       <Stack.Screen name="ArchiveOrders" component={ArchiveOrders} options={{ title: 'Archive' }} />
       <Stack.Screen name="OrderDetail" component={OrderDetail} options={{ title: 'Order Details' }} />
-      <Stack.Screen name="HomePage" component={HomePage} options={{ title: 'Home' }} />
       <Stack.Screen name="Login" component={Login} options={{ title: 'Login' }} />
       <Stack.Screen name="Register" component={Register} options={{ title: 'Register' }} />
-      <Stack.Screen name="ClientDashboard" options={{ headerShown: false }}>
-        {(props) => <ProtectedRoute requiredRole="client"><ClientDashboard {...props} /></ProtectedRoute>}
-      </Stack.Screen>
-      <Stack.Screen name="AdminDashboard" options={{ headerShown: false }}>
-        {(props) => <ProtectedRoute requiredRole="admin"><AdminDashboard {...props} /></ProtectedRoute>}
-      </Stack.Screen>
-      <Stack.Screen name="CleanerDashboard" options={{ headerShown: false }}>
-        {(props) => <ProtectedRoute requiredRole="cleaner"><CleanerDashboard {...props} /></ProtectedRoute>}
-      </Stack.Screen>
+      <Stack.Screen name="ForgotPassword" component={ForgotPassword} options={{ title: 'Forgot Password' }} />
+      <Stack.Screen name="ResetPassword" component={ResetPassword} options={{ title: 'Reset Password' }} />
     </Stack.Navigator>
   );
 }
 
 function MainTabs() {
+  const { userRole } = useAuth();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const compactTabBar = width < 390;
+  const unreadCount = useUnreadCount();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -202,20 +225,34 @@ function MainTabs() {
           tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'checkmark-circle' : 'checkmark-circle-outline'} size={compactTabBar ? 20 : size} color={color} />,
         }}
       />
+      {userRole === 'cleaner' ? (
+        <Tab.Screen
+          name="PendingTab"
+          component={PendingStack}
+          options={{
+            title: 'Pending',
+            tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'time' : 'time-outline'} size={compactTabBar ? 20 : size} color={color} />,
+          }}
+        />
+      ) : (
+        <Tab.Screen
+          name="NewOrderTab"
+          component={NewOrderStack}
+          options={{
+            title: 'New',
+            unmountOnBlur: true,
+            tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={compactTabBar ? 20 : size} color={color} />,
+          }}
+        />
+      )}
       <Tab.Screen
-        name="NewOrderTab"
-        component={NewOrderStack}
+        name="MessagesTab"
+        component={ChatScreen}
         options={{
-          title: 'New',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'add-circle' : 'add-circle-outline'} size={compactTabBar ? 20 : size} color={color} />,
-        }}
-      />
-      <Tab.Screen
-        name="ProfileTab"
-        component={ProfileScreen}
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={compactTabBar ? 20 : size} color={color} />,
+          title: 'Chat',
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={compactTabBar ? 20 : size} color={color} />,
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
+          tabBarBadgeStyle: { backgroundColor: '#00AEEF', fontSize: 10, minWidth: 18, height: 18, lineHeight: 18 },
         }}
       />
       <Tab.Screen
@@ -227,15 +264,47 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="MessagesTab"
-        component={ChatScreen}
+        name="ProfileTab"
+        component={ProfileScreen}
         options={{
-          title: 'Chat',
-          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={compactTabBar ? 20 : size} color={color} />,
+          title: 'Profile',
+          tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'person' : 'person-outline'} size={compactTabBar ? 20 : size} color={color} />,
         }}
       />
     </Tab.Navigator>
   );
+}
+
+function AuthStack() {
+  return (
+    <Stack.Navigator
+      initialRouteName="Login"
+      screenOptions={{
+        headerStyle: { backgroundColor: '#00AEEF' },
+        headerTintColor: '#fff',
+        headerTitleStyle: { fontWeight: 'bold' },
+      }}
+    >
+      <Stack.Screen name="Login" component={Login} options={{ title: 'Login' }} />
+      <Stack.Screen name="Register" component={Register} options={{ title: 'Register' }} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPassword} options={{ title: 'Forgot Password' }} />
+      <Stack.Screen name="ResetPassword" component={ResetPassword} options={{ title: 'Reset Password' }} />
+    </Stack.Navigator>
+  );
+}
+
+function AppNavigator() {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" color="#00AEEF" />
+      </View>
+    );
+  }
+
+  return isAuthenticated ? <MainTabs /> : <AuthStack />;
 }
 
 export default function App() {
@@ -257,11 +326,8 @@ export default function App() {
     };
     if (typeof global !== 'undefined' && typeof global.addEventListener === 'function') {
       global.addEventListener('unhandledrejection', onUnhandledRejection);
-      initMockData();
       return () => global.removeEventListener('unhandledrejection', onUnhandledRejection);
     }
-
-    initMockData();
   }, []);
 
   return (
@@ -276,7 +342,7 @@ export default function App() {
                 <NavigationContainer ref={navigationRef}>
                   <RootNavigationContext.Provider value={navigationRef}>
                     <StatusBar style="auto" />
-                    <MainTabs />
+                    <AppNavigator />
                   </RootNavigationContext.Provider>
                 </NavigationContainer>
               </SafeAreaProvider>

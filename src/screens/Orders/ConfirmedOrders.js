@@ -18,7 +18,7 @@ import Button from '../../components/Common/Button';
 
 const ConfirmedOrders = ({ navigation }) => {
   const { t } = useLanguage();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, userRole } = useAuth();
   const [orders, setOrders] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -26,16 +26,18 @@ const ConfirmedOrders = ({ navigation }) => {
   const fetchOrders = useCallback(async () => {
     try {
       const data = await getOrders();
-      // Sort: confirmed/assigned/accepted first, then pending, then rest
-      const priority = { confirmed: 0, assigned: 1, accepted: 1, pending: 2, completed: 3, cancelled: 4, archived: 5 };
-      data.sort((a, b) => (priority[a.status] ?? 99) - (priority[b.status] ?? 99));
-      setOrders(data);
+      const visibleOrders = userRole === 'cleaner'
+        ? data.filter((order) => order.status !== 'assigned')
+        : data;
+      const priority = { confirmed: 0, accepted: 1, assigned: 2, pending: 3, completed: 4, cancelled: 5, archived: 6 };
+      visibleOrders.sort((a, b) => (priority[a.status] ?? 99) - (priority[b.status] ?? 99));
+      setOrders(visibleOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userRole]);
 
   useEffect(() => {
     if (isAuthenticated) {

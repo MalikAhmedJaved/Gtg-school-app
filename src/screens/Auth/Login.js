@@ -7,30 +7,8 @@ import { useToast } from '../../contexts/ToastContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../../components/Common/Button';
 import Logo from '../../components/Common/Logo';
-// NOTE: Demo-only hardcoded credentials for showcasing dashboards
-const DEMO_USERS = [
-  {
-    id: 'demo-admin',
-    role: 'admin',
-    email: 'admin@rentplus.com',
-    password: 'Admin123!',
-    name: 'Demo Admin',
-  },
-  {
-    id: 'demo-client',
-    role: 'client',
-    email: 'client@rentplus.com',
-    password: 'Client123!',
-    name: 'Demo Client',
-  },
-  {
-    id: 'demo-cleaner',
-    role: 'cleaner',
-    email: 'cleaner@rentplus.com',
-    password: 'Cleaner123!',
-    name: 'Demo Cleaner',
-  },
-];
+import api from '../../utils/api';
+import { navigate as rootNavigate } from '../../utils/rootNavigation';
 
 const Login = () => {
   const { t } = useLanguage();
@@ -42,12 +20,38 @@ const Login = () => {
     password: '',
   });
   const [loading, setLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
+  const [resending, setResending] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   const handleChange = (field, value) => {
+    if (loginError) setLoginError('');
     setFormData({ ...formData, [field]: value });
   };
 
+  const handleResendVerification = async () => {
+    if (!resendEmail) return;
+    setResending(true);
+    try {
+      const response = await api.post('/auth/resend-verification', { email: resendEmail });
+      if (response.data.success) {
+        Alert.alert(
+          t('auth.verificationSent', 'Verification Sent'),
+          t('auth.verificationSentMsg', 'A new verification email has been sent. Please check your inbox.')
+        );
+        setShowResendVerification(false);
+      }
+    } catch (error) {
+      const message = error.response?.data?.message || t('auth.resendFailed', 'Failed to resend verification email.');
+      Alert.alert('Error', message);
+    } finally {
+      setResending(false);
+    }
+  };
+
   const handleSubmit = async () => {
+    setLoginError('');
     if (!formData.email || !formData.password) {
       Alert.alert('Error', t('auth.emailRequired', 'Please enter email and password.'));
       return;
@@ -55,47 +59,48 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // Local demo-only auth: match against hardcoded users (works in dev and APK)
-      const email = (formData.email || '').trim().toLowerCase();
-      const password = (formData.password || '').trim();
-      const user = DEMO_USERS.find(
-        (u) => u.email.toLowerCase() === email && u.password === password
-      );
+      const response = await api.post('/auth/login', {
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password.trim(),
+      });
 
-      if (!user) {
-        Alert.alert(
-          'Error',
-          t(
-            'auth.loginError',
-            'Invalid email or password. Use one of the provided demo accounts.'
-          )
-        );
-        return;
+      if (response.data.success) {
+        const { user, token } = response.data.data;
+        await login(user, token);
+
+        showToast(t('auth.loginSuccess', 'Login successful!'), 'success');
+
+        // Open Menu screen after login so users see menu items first.
+        setTimeout(() => {
+          rootNavigate('MenuTab', { screen: 'MenuScreen' });
+        }, 150);
       }
-
-      // Fake token for demo
-      const token = 'demo-token';
-      await login(user, token);
-
-      showToast(t('auth.loginSuccess', 'Login successful!'), 'success');
-
-      // Navigate to appropriate dashboard after auth state is committed
-      // (avoids race where ProtectedRoute mounts before context updates, especially in release/APK)
-      const dashboardRoute =
-        user.role === 'admin'
-          ? 'AdminDashboard'
-          : user.role === 'cleaner'
-          ? 'CleanerDashboard'
-          : 'ClientDashboard';
-      setTimeout(() => {
-        navigation.replace(dashboardRoute);
-      }, 150);
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert(
-        'Error',
-        t('auth.loginError', 'Login failed. Please try again.')
-      );
+      const errorCode = error.response?.data?.code;
+      const errorMessage = error.response?.data?.message;
+      const statusCode = error.response?.status;
+
+      if (errorCode === 'EMAIL_NOT_VERIFIED') {
+        // Show resend verification option
+        setResendEmail(formData.email.trim().toLowerCase());
+        setShowResendVerification(true);
+        Alert.alert(
+          t('auth.emailNotVerified', 'Email Not Verified'),
+          t('auth.emailNotVerifiedMsg', 'Please verify your email address before logging in. Check your inbox or use the resend option below.')
+        );
+      } else {
+        const isInvalidCredentials =
+          statusCode === 401 ||
+          errorCode === 'INVALID_CREDENTIALS' ||
+          /invalid|incorrect|password|credentials|unauthorized/i.test(errorMessage || '');
+
+        const inlineMessage = isInvalidCredentials
+          ? t('auth.invalidCredentials', 'Password is not correct. Please try again.')
+          : (errorMessage || t('auth.loginError', 'Login failed. Please check your credentials and try again.'));
+
+        setLoginError(inlineMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -143,6 +148,30 @@ const Login = () => {
           style={styles.submitButton}
         />
 
+        {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
+
+        <Text
+          style={styles.forgotLinkText}
+          onPress={() => navigation.navigate('ForgotPassword')}
+        >
+          {t('auth.forgotPassword', 'Forgot Password?')}
+        </Text>
+
+        {showResendVerification && (
+          <View style={styles.resendContainer}>
+            <Text style={styles.resendText}>
+              {t('auth.emailNotVerifiedHint', 'Your email is not verified yet.')}
+            </Text>
+            <Button
+              title={resending ? t('common.loading', 'Sending...') : t('auth.resendVerification', 'Resend Verification Email')}
+              onPress={handleResendVerification}
+              loading={resending}
+              variant="secondary"
+              style={styles.resendButton}
+            />
+          </View>
+        )}
+
         <View style={styles.registerLink}>
           <Text style={styles.registerText}>
             {t('auth.dontHaveAccount', 'Don\'t have an account?')}{' '}
@@ -153,13 +182,6 @@ const Login = () => {
           >
             {t('auth.register', 'Register here')}
           </Text>
-        </View>
-
-        <View style={styles.demoHint}>
-          <Text style={styles.demoHintTitle}>Demo logins (for testing)</Text>
-          <Text style={styles.demoHintText}>Admin: admin@rentplus.com / Admin123!</Text>
-          <Text style={styles.demoHintText}>Client: client@rentplus.com / Client123!</Text>
-          <Text style={styles.demoHintText}>Cleaner: cleaner@rentplus.com / Cleaner123!</Text>
         </View>
       </View>
     </ScrollView>
@@ -218,6 +240,20 @@ const styles = StyleSheet.create({
   submitButton: {
     marginTop: spacing.md,
   },
+  errorText: {
+    marginTop: spacing.sm,
+    fontSize: typography.fontSize.sm,
+    color: colors.error,
+    textAlign: 'center',
+    fontWeight: typography.fontWeight.semibold,
+  },
+  forgotLinkText: {
+    marginTop: spacing.md,
+    textAlign: 'center',
+    color: colors.primary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+  },
   registerLink: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -232,22 +268,22 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: typography.fontWeight.semibold,
   },
-  demoHint: {
-    marginTop: spacing.xl,
+  resendContainer: {
+    marginTop: spacing.lg,
     padding: spacing.md,
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: '#FFF3CD',
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#FFEAA7',
   },
-  demoHintTitle: {
+  resendText: {
     fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.xs,
+    color: '#856404',
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  demoHintText: {
-    fontSize: typography.fontSize.xs,
-    color: colors.text,
-    marginBottom: 2,
+  resendButton: {
+    marginTop: spacing.xs,
   },
 });
 

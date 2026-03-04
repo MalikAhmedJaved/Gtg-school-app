@@ -3,9 +3,6 @@ import api from './api';
 
 const ORDERS_STORAGE_KEY = '@cleaning_orders';
 
-// Generate a unique ID for local orders
-const generateId = () => `order-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
 // Calculate hours based on order selections
 export const calculateHours = (orderData) => {
   const { cleaningCategory, adhocSelections = [], homeSize, extraBathrooms = 0 } = orderData;
@@ -40,7 +37,80 @@ export const calculateHours = (orderData) => {
   return orderData.manualHours || 3;
 };
 
-// Get orders from local storage
+// Map mobile app service/category to backend cleaningType enum:
+// residential | commercial | deep | move
+const mapCleaningType = (serviceType, cleaningCategory) => {
+  if (serviceType === 'commercial') return 'commercial';
+  if (serviceType === 'moveinout') return 'move';
+
+  // Home category mapping
+  if (cleaningCategory === 'main') return 'deep';
+  return 'residential';
+};
+
+// Map backend task data to mobile app order format (for display)
+const mapTaskToOrder = (task) => ({
+  _id: String(task.id),
+  id: task.id,
+  serviceType: task.cleaningType === 'residential' ? 'home' : task.cleaningType === 'move' ? 'moveinout' : task.cleaningType,
+  cleaningType: task.cleaningType,
+  address: task.address,
+  date: task.date,
+  time: task.time,
+  hours: task.hours,
+  calculatedHours: task.hours,
+  comments: task.comments,
+  status: task.status,
+  client: task.client,
+  cleaner: task.cleaner,
+  rating: task.rating,
+  ratingComment: task.ratingComment,
+  createdAt: task.createdAt,
+  updatedAt: task.updatedAt,
+  completedAt: task.completedAt,
+  cancelledAt: task.cancelledAt,
+  frequency: task.frequency,
+  checklist: task.checklist,
+});
+
+// Map mobile app order data to backend task format (for creation)
+const mapOrderToTask = (orderData) => {
+  const hours = calculateHours(orderData);
+  
+  // Build checklist from selections
+  const checklist = [];
+  if (orderData.asNeededSelections?.length) {
+    checklist.push(...orderData.asNeededSelections);
+  }
+  if (orderData.mainCleaningExtras?.length) {
+    checklist.push(...orderData.mainCleaningExtras);
+  }
+  if (orderData.adhocSelections?.length) {
+    checklist.push(...orderData.adhocSelections);
+  }
+  if (orderData.extraTargeted) {
+    if (orderData.extraTargeted.animalHair) checklist.push('animalHair');
+    if (orderData.extraTargeted.smoking) checklist.push('smoking');
+  }
+  if (orderData.equipment) {
+    Object.entries(orderData.equipment).forEach(([key, val]) => {
+      if (val) checklist.push(`equipment:${key}`);
+    });
+  }
+
+  return {
+    address: orderData.address || '',
+    date: orderData.date || new Date().toISOString().split('T')[0],
+    time: orderData.time || '09:00',
+    hours: hours,
+    cleaningType: mapCleaningType(orderData.serviceType, orderData.cleaningCategory),
+    frequency: 'once',
+    comments: orderData.comments || '',
+    checklist: checklist,
+  };
+};
+
+// Get orders from local storage (fallback only)
 const getLocalOrders = async () => {
   try {
     const data = await AsyncStorage.getItem(ORDERS_STORAGE_KEY);
@@ -51,7 +121,7 @@ const getLocalOrders = async () => {
   }
 };
 
-// Save orders to local storage
+// Save orders to local storage (fallback only)
 const saveLocalOrders = async (orders) => {
   try {
     await AsyncStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
@@ -60,73 +130,103 @@ const saveLocalOrders = async (orders) => {
   }
 };
 
-// Create a new order
+// Create a new order (task)
 export const createOrder = async (orderData) => {
-  const order = {
-    _id: generateId(),
-    ...orderData,
-    calculatedHours: calculateHours(orderData),
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  const taskPayload = mapOrderToTask(orderData);
 
   try {
-    // Try API first
-    const response = await api.post('/orders', order);
-    return response.data;
+    const response = await api.post('/tasks', taskPayload);
+    if (response.data.success) {
+      const task = response.data.data;
+      return Array.isArray(task) ? mapTaskToOrder(task[0]) : mapTaskToOrder(task);
+    }
+    throw new Error(response.data.message || 'Failed to create task');
   } catch (error) {
-    // Fallback to local storage
-    console.log('API unavailable, saving order locally');
+    // Fallback to local storage if API is unreachable
+    console.log('API unavailable, saving order locally:', error.message);
+    const localOrder = {
+      _id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      ...orderData,
+      calculatedHours: calculateHours(orderData),
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      _isLocal: true, // flag to identify local-only orders
+    };
     const orders = await getLocalOrders();
-    orders.unshift(order);
+    orders.unshift(localOrder);
     await saveLocalOrders(orders);
-    return order;
+    return localOrder;
   }
 };
 
-// Get all orders, optionally filtered
+// Get all orders (tasks), optionally filtered
 export const getOrders = async (filters = {}) => {
   try {
-    const response = await api.get('/orders', { params: filters });
-    return response.data;
+    // Map status filters to the correct backend endpoint
+    let endpoint = '/tasks';
+    const params = {};
+
+    if (filters.status) {
+      const statusArr = Array.isArray(filters.status) ? filters.status : [filters.status];
+      if (statusArr.includes('pending')) {
+        // /tasks/pending is admin-only; use role-safe /tasks with status filter instead
+        endpoint = '/tasks';
+        params.status = 'pending';
+      } else if (statusArr.includes('assigned') || statusArr.includes('accepted')) {
+        endpoint = '/tasks/assigned';
+      } else if (statusArr.includes('completed')) {
+        endpoint = '/tasks/completed';
+      }
+    }
+
+    const response = await api.get(endpoint, { params });
+    if (response.data.success) {
+      const tasks = Array.isArray(response.data.data) ? response.data.data : [response.data.data].filter(Boolean);
+      return tasks.map(mapTaskToOrder);
+    }
+    return [];
   } catch (error) {
     // Fallback to local storage
-    console.log('API unavailable, reading local orders');
+    console.log('API unavailable, reading local orders:', error.message);
     let orders = await getLocalOrders();
 
-    // Apply local filters
     if (filters.status) {
-      if (Array.isArray(filters.status)) {
-        orders = orders.filter((o) => filters.status.includes(o.status));
-      } else {
-        orders = orders.filter((o) => o.status === filters.status);
-      }
+      const statusArr = Array.isArray(filters.status) ? filters.status : [filters.status];
+      orders = orders.filter((o) => statusArr.includes(o.status));
     }
 
     return orders;
   }
 };
 
-// Get a single order by ID
+// Get a single order (task) by ID
 export const getOrderById = async (id) => {
   try {
-    const response = await api.get(`/orders/${id}`);
-    return response.data;
+    const response = await api.get(`/tasks/${id}`);
+    if (response.data.success) {
+      return mapTaskToOrder(response.data.data);
+    }
+    return null;
   } catch (error) {
+    // Fallback to local storage
     const orders = await getLocalOrders();
-    return orders.find((o) => o._id === id) || null;
+    return orders.find((o) => o._id === String(id)) || null;
   }
 };
 
-// Cancel an order
+// Cancel an order (task)
 export const cancelOrder = async (id) => {
   try {
-    const response = await api.patch(`/orders/${id}`, { status: 'cancelled' });
-    return response.data;
+    const response = await api.post(`/tasks/${id}/cancel`);
+    if (response.data.success) {
+      return mapTaskToOrder(response.data.data);
+    }
+    throw new Error(response.data.message || 'Failed to cancel task');
   } catch (error) {
+    // Fallback to local storage
     const orders = await getLocalOrders();
-    const index = orders.findIndex((o) => o._id === id);
+    const index = orders.findIndex((o) => o._id === String(id));
     if (index !== -1) {
       orders[index].status = 'cancelled';
       orders[index].updatedAt = new Date().toISOString();
@@ -156,6 +256,7 @@ export const ORDER_STATUSES = {
   pending: { label: 'Pending', color: '#ed8936' },
   confirmed: { label: 'Confirmed', color: '#38a169' },
   assigned: { label: 'Assigned', color: '#2c7a7b' },
+  accepted: { label: 'Accepted', color: '#2c7a7b' },
   completed: { label: 'Completed', color: '#4a5568' },
   cancelled: { label: 'Cancelled', color: '#dc3545' },
   archived: { label: 'Archived', color: '#718096' },

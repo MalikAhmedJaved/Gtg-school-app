@@ -17,3 +17,8 @@ web-build/
 # Temporary files
 *.log
 *.tmp
+
+# Environment variables
+.env
+.env.local
+.env.production

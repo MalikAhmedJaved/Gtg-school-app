@@ -12,19 +12,51 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Logo from '../../components/Common/Logo';
-import { navigate as rootNavigate, navigationRef } from '../../utils/rootNavigation';
 
 const MenuScreen = ({ navigation }) => {
   const { t } = useLanguage();
-  const { isAuthenticated, userRole, logout } = useAuth();
+  const { isAuthenticated, logout, userRole } = useAuth();
+  const isAdmin = userRole === 'admin';
 
   const handleLogout = async () => {
     await logout();
     // Stay on menu after logout
   };
 
-  // Primary menu items — the main sections requested
-  const primaryItems = [
+  // Admin-specific menu items
+  const adminItems = [
+    {
+      key: 'users',
+      label: t('admin.users', 'Users'),
+      icon: 'people-outline',
+      screen: 'AdminDashboard',
+      params: { initialTab: 'users' },
+    },
+    {
+      key: 'tasks',
+      label: t('admin.taskManagement', 'Task Management'),
+      icon: 'clipboard-outline',
+      screen: 'AdminDashboard',
+      params: { initialTab: 'tasks' },
+    },
+    {
+      key: 'jobseekers',
+      label: t('admin.jobSeekers', 'Job Seekers'),
+      icon: 'document-text-outline',
+      screen: 'AdminDashboard',
+      params: { initialTab: 'jobseekers' },
+    },
+    {
+      key: 'archives',
+      label: t('dashboard.archives', 'Archives'),
+      icon: 'folder-outline',
+      screen: 'AdminDashboard',
+      params: { initialTab: 'archives' },
+    },
+  ];
+
+  // Primary menu items — the main sections for non-admin
+  const primaryItems = isAdmin ? adminItems : [
     {
       key: 'pending',
       label: t('nav.pending', 'Pending'),
@@ -43,27 +75,12 @@ const MenuScreen = ({ navigation }) => {
       icon: 'archive-outline',
       screen: 'ArchiveOrders',
     },
-    {
-      key: 'services',
-      label: t('nav.services', 'Services'),
-      icon: 'brush-outline',
-      screen: 'Services',
-    },
   ];
 
-  // Secondary menu items
-  const secondaryItems = [
+  // Secondary menu items (hidden for admin)
+  const secondaryItems = isAdmin ? [] : [
     { key: 'about', label: t('nav.about', 'About'), icon: 'information-circle-outline', screen: 'About' },
-    { key: 'careers', label: t('nav.careers', 'Careers'), icon: 'briefcase-outline', screen: 'Careers' },
-    { key: 'home', label: t('nav.homePage', 'Home Page'), icon: 'home-outline', screen: 'HomePage' },
   ];
-
-  const getDashboardScreen = () => {
-    if (userRole === 'admin') return 'AdminDashboard';
-    if (userRole === 'cleaner') return 'CleanerDashboard';
-    if (userRole === 'client') return 'ClientDashboard';
-    return null;
-  };
 
   const authItems = !isAuthenticated
     ? [
@@ -71,16 +88,6 @@ const MenuScreen = ({ navigation }) => {
         { key: 'register', label: t('nav.register', 'Register'), icon: 'person-add-outline', screen: 'Register' },
       ]
     : [
-        ...(getDashboardScreen()
-          ? [
-              {
-                key: 'dashboard',
-                label: t('nav.dashboard', 'Dashboard'),
-                icon: 'grid-outline',
-                screen: getDashboardScreen(),
-              },
-            ]
-          : []),
         { key: 'logout', label: t('nav.logout', 'Logout'), icon: 'log-out-outline', action: handleLogout },
       ];
 
@@ -89,7 +96,11 @@ const MenuScreen = ({ navigation }) => {
       item.action();
       return;
     }
-    navigation.navigate(item.screen);
+    if (item.params) {
+      navigation.navigate(item.screen, item.params);
+    } else {
+      navigation.navigate(item.screen);
+    }
   };
 
   const renderMenuItem = (item) => (
@@ -121,14 +132,17 @@ const MenuScreen = ({ navigation }) => {
         {/* Divider */}
         <View style={styles.divider} />
 
-        {/* Secondary */}
-        <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>{t('nav.explore', 'Explore')}</Text>
-          {secondaryItems.map(renderMenuItem)}
-        </View>
+        {/* Secondary (hidden for admin) */}
+        {secondaryItems.length > 0 ? (
+          <>
+            <View style={styles.menuSection}>
+              <Text style={styles.sectionTitle}>{t('nav.explore', 'Explore')}</Text>
+              {secondaryItems.map(renderMenuItem)}
+            </View>
+            <View style={styles.divider} />
+          </>
+        ) : null}
 
-        {/* Divider */}
-        <View style={styles.divider} />
 
         {/* Auth items */}
         <View style={styles.menuSection}>

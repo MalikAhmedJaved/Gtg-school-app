@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,21 +9,23 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { useAuth } from '../../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius } from '../../../constants/theme';
 import DashboardSidebar from '../../../components/Layout/DashboardSidebar';
 import Profile from '../../../components/Dashboards/Profile';
 import Button from '../../../components/Common/Button';
+import api from '../../../utils/api';
 
 const CleanerDashboard = () => {
   const insets = useSafeAreaInsets();
   const { t } = useLanguage();
-  const { userData } = useAuth();
-  const navigation = useNavigation();
   const [activeTab, setActiveTab] = useState('tasks');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [availableTasks, setAvailableTasks] = useState([]);
+  const [archivedTasks, setArchivedTasks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const menuItems = [
     {
@@ -46,68 +48,93 @@ const CleanerDashboard = () => {
     },
   ];
 
-  const dummyAvailableTasks = [
-    { id: 1, address: '123 Main St, Copenhagen', date: '2026-01-30', time: '10:00', hours: 3, client: 'John Smith' },
-    { id: 2, address: '456 Oak Ave, Aarhus', date: '2026-02-01', time: '14:00', hours: 4, client: 'ABC Company' },
-  ];
+  const fetchTasks = useCallback(async () => {
+    setLoading(true);
+    setErrorMessage('');
+    try {
+      const [assignedRes, completedRes] = await Promise.all([
+        api.get('/tasks/assigned'),
+        api.get('/tasks/completed'),
+      ]);
 
-  const dummyArchivedTasks = [
-    { id: 3, address: '789 Pine Rd, Odense', date: '2026-01-15', hours: 3, client: 'Maria Garcia', rating: 5, payment: '€90' },
-    { id: 4, address: '321 Elm St, Aalborg', date: '2026-01-20', hours: 4, client: 'John Smith', rating: 4, payment: '€120' },
-  ];
+      setAvailableTasks(assignedRes.data?.success ? (assignedRes.data.data || []) : []);
+      setArchivedTasks(completedRes.data?.success ? (completedRes.data.data || []) : []);
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || 'Failed to load tasks');
+      setAvailableTasks([]);
+      setArchivedTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleAcceptTask = (taskId) => {
-    Alert.alert('Success', `Task #${taskId} accepted!`);
+  useEffect(() => {
+    if (activeTab !== 'profile') {
+      fetchTasks();
+    }
+  }, [activeTab, fetchTasks]);
+
+  const handleAcceptTask = async (taskId) => {
+    try {
+      await api.post(`/tasks/${taskId}/accept`);
+      fetchTasks();
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to accept task');
+    }
   };
+
+  const handleCompleteTask = async (task) => {
+    try {
+      await api.post(`/tasks/${task.id}/complete`, { actualHours: task.hours || 1 });
+      fetchTasks();
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to complete task');
+    }
+  };
+
+  const renderTaskCard = (task, isArchive = false) => (
+    <View key={task.id} style={styles.taskCard}>
+      <View style={styles.taskHeader}>
+        <Text style={styles.taskId}>Task #{task.id}</Text>
+        <Text style={[styles.taskStatus, task.status === 'completed' && styles.statusCompleted]}>
+          {task.status}
+        </Text>
+      </View>
+      <Text style={styles.taskAddress}>📍 {task.address || '-'}</Text>
+      <Text style={styles.taskDate}>📅 {(task.date || '').slice?.(0, 10) || task.date} {task.time ? `at ${task.time}` : ''}</Text>
+      <Text style={styles.taskHours}>⏱️ {task.hours || '-'} hours</Text>
+      <Text style={styles.taskClient}>👤 Client: {task.client?.name || '-'}</Text>
+      {task.rating ? <Text style={styles.taskRating}>⭐ Rating: {task.rating}/5</Text> : null}
+
+      {!isArchive ? (
+        <View style={styles.buttonRow}>
+          {task.status === 'assigned' ? (
+            <Button title="Accept Task" onPress={() => handleAcceptTask(task.id)} variant="primary" style={styles.actionButton} />
+          ) : null}
+          {task.status === 'assigned' || task.status === 'accepted' ? (
+            <Button title="Complete Task" onPress={() => handleCompleteTask(task)} variant="secondary" style={styles.actionButton} />
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
 
   const renderContent = () => {
     switch (activeTab) {
       case 'tasks':
         return (
           <View style={styles.contentSection}>
-            <Text style={styles.sectionTitle}>
-              {t('cleaner.availableTasks', 'Available Tasks')}
-            </Text>
-            {dummyAvailableTasks.map((task) => (
-              <View key={task.id} style={styles.taskCard}>
-                <View style={styles.taskHeader}>
-                  <Text style={styles.taskId}>Task #{task.id}</Text>
-                  <Text style={styles.taskStatus}>📋 Available</Text>
-                </View>
-                <Text style={styles.taskAddress}>📍 {task.address}</Text>
-                <Text style={styles.taskDate}>📅 {task.date} at {task.time}</Text>
-                <Text style={styles.taskHours}>⏱️ {task.hours} hours</Text>
-                <Text style={styles.taskClient}>👤 Client: {task.client}</Text>
-                <Button
-                  title="Accept Task"
-                  onPress={() => handleAcceptTask(task.id)}
-                  variant="primary"
-                  style={styles.acceptButton}
-                />
-              </View>
-            ))}
+            <Text style={styles.sectionTitle}>{t('cleaner.availableTasks', 'Available Tasks')}</Text>
+            {availableTasks.map((task) => renderTaskCard(task, false))}
+            {!loading && availableTasks.length === 0 ? <Text style={styles.emptyText}>No tasks assigned.</Text> : null}
           </View>
         );
       case 'archives':
         return (
           <View style={styles.contentSection}>
-            <Text style={styles.sectionTitle}>
-              {t('cleaner.myArchives', 'My Archives')}
-            </Text>
-            {dummyArchivedTasks.map((task) => (
-              <View key={task.id} style={styles.taskCard}>
-                <View style={styles.taskHeader}>
-                  <Text style={styles.taskId}>Task #{task.id}</Text>
-                  <Text style={[styles.taskStatus, styles.statusCompleted]}>✅ Completed</Text>
-                </View>
-                <Text style={styles.taskAddress}>📍 {task.address}</Text>
-                <Text style={styles.taskDate}>📅 {task.date}</Text>
-                <Text style={styles.taskHours}>⏱️ {task.hours} hours</Text>
-                <Text style={styles.taskClient}>👤 Client: {task.client}</Text>
-                <Text style={styles.taskRating}>⭐ Rating: {task.rating}/5</Text>
-                <Text style={styles.taskPayment}>💰 Payment: {task.payment}</Text>
-              </View>
-            ))}
+            <Text style={styles.sectionTitle}>{t('cleaner.myArchives', 'My Archives')}</Text>
+            {archivedTasks.map((task) => renderTaskCard(task, true))}
+            {!loading && archivedTasks.length === 0 ? <Text style={styles.emptyText}>No completed tasks.</Text> : null}
           </View>
         );
       case 'profile':
@@ -119,50 +146,37 @@ const CleanerDashboard = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <DashboardSidebar
-        menuItems={menuItems}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
+      <DashboardSidebar menuItems={menuItems} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main Content Area */}
       <View style={[styles.mainContent, !sidebarOpen && styles.mainContentFull]}>
-        {/* Header with Menu Toggle */}
         <View style={[styles.mobileHeader, { paddingTop: Math.max(insets.top, spacing.md) }]}>
-          <TouchableOpacity
-            style={styles.menuButton}
-            onPress={() => setSidebarOpen(!sidebarOpen)}
-          >
+          <TouchableOpacity style={styles.menuButton} onPress={() => setSidebarOpen(!sidebarOpen)}>
             <Text style={styles.menuIcon}>☰</Text>
           </TouchableOpacity>
-          <Text style={styles.mobileTitle}>
-            {t('dashboard.cleanerDashboard', 'Cleaner Dashboard')}
-          </Text>
+          <Text style={styles.mobileTitle}>{t('dashboard.cleanerDashboard', 'Cleaner Dashboard')}</Text>
           <View style={styles.headerSpacer} />
         </View>
 
-        {/* Dashboard Container */}
-        <ScrollView
-          style={styles.scrollContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.dashboardContainer}>
-            {/* Desktop Title */}
             <View style={styles.headerWrapper}>
-              <Text style={styles.desktopTitle}>
-                {t('dashboard.cleanerDashboard', 'Cleaner Dashboard')}
-              </Text>
+              <Text style={styles.desktopTitle}>{t('dashboard.cleanerDashboard', 'Cleaner Dashboard')}</Text>
             </View>
 
-            {/* Dashboard Content: full height for all tabs (same as Profile) */}
             {activeTab === 'profile' ? (
               <View style={styles.contentWrapper}>
                 <Profile userRole="cleaner" />
               </View>
             ) : (
               <View style={styles.contentWrapper}>
-                <ScrollView style={styles.dashboardContent} contentContainerStyle={styles.dashboardContentContainer} showsVerticalScrollIndicator={true}>
+                <View style={styles.topActions}>
+                  <TouchableOpacity style={styles.refreshBtn} onPress={fetchTasks}>
+                    <Text style={styles.refreshText}>Refresh</Text>
+                  </TouchableOpacity>
+                </View>
+                {loading ? <Text style={styles.emptyText}>Loading tasks...</Text> : null}
+                {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+                <ScrollView style={styles.dashboardContent} contentContainerStyle={styles.dashboardContentContainer} showsVerticalScrollIndicator>
                   {renderContent()}
                 </ScrollView>
               </View>
@@ -180,12 +194,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.backgroundLight,
     flexDirection: 'row',
   },
-  mainContent: {
-    flex: 1,
-  },
-  mainContentFull: {
-    marginLeft: 0,
-  },
+  mainContent: { flex: 1 },
+  mainContentFull: { marginLeft: 0 },
   mobileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -194,13 +204,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.gray[200],
   },
-  menuButton: {
-    padding: spacing.sm,
-  },
-  menuIcon: {
-    fontSize: 24,
-    color: colors.primary,
-  },
+  menuButton: { padding: spacing.sm },
+  menuIcon: { fontSize: 24, color: colors.primary },
   mobileTitle: {
     flex: 1,
     fontSize: typography.fontSize.lg,
@@ -209,32 +214,17 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: spacing.md,
   },
-  headerSpacer: {
-    width: 40,
-  },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollContentContainer: {
-    flexGrow: 1,
-  },
-  dashboardContainer: {
-    flex: 1,
-    width: '100%',
-    padding: spacing.md,
-  },
-  headerWrapper: {
-    marginBottom: spacing.lg,
-  },
+  headerSpacer: { width: 40 },
+  scrollContent: { flex: 1 },
+  scrollContentContainer: { flexGrow: 1 },
+  dashboardContainer: { flex: 1, width: '100%', padding: spacing.md },
+  headerWrapper: { marginBottom: spacing.lg },
   desktopTitle: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
     color: colors.primary,
   },
-  contentWrapper: {
-    flex: 1,
-    minHeight: 400,
-  },
+  contentWrapper: { flex: 1, minHeight: 400 },
   dashboardContent: {
     flex: 1,
     backgroundColor: colors.white,
@@ -245,12 +235,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  dashboardContentContainer: {
-    paddingBottom: spacing.xl,
-  },
-  contentSection: {
-    padding: spacing.md,
-  },
+  dashboardContentContainer: { paddingBottom: spacing.xl },
+  contentSection: { padding: spacing.md },
   sectionTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
@@ -263,6 +249,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: spacing.xl,
   },
+  errorText: {
+    color: colors.error,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
   taskCard: {
     backgroundColor: colors.backgroundLight,
     padding: spacing.md,
@@ -271,60 +262,25 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: colors.primary,
   },
-  taskHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
+  taskHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
+  taskId: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.bold, color: colors.primary },
+  taskStatus: { fontSize: typography.fontSize.sm, fontWeight: typography.fontWeight.semibold, color: colors.warning },
+  statusCompleted: { color: colors.success },
+  taskAddress: { fontSize: typography.fontSize.md, color: colors.textDark, marginBottom: spacing.xs },
+  taskDate: { fontSize: typography.fontSize.sm, color: colors.text, marginBottom: spacing.xs },
+  taskHours: { fontSize: typography.fontSize.sm, color: colors.text, marginBottom: spacing.xs },
+  taskClient: { fontSize: typography.fontSize.sm, color: colors.text, marginBottom: spacing.xs },
+  taskRating: { fontSize: typography.fontSize.sm, color: colors.text, marginTop: spacing.xs, fontWeight: typography.fontWeight.semibold },
+  buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
+  actionButton: { marginTop: spacing.xs },
+  topActions: { alignItems: 'flex-end', marginBottom: spacing.md },
+  refreshBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primaryLight,
   },
-  taskId: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
-  },
-  taskStatus: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.warning,
-  },
-  statusCompleted: {
-    color: colors.success,
-  },
-  taskAddress: {
-    fontSize: typography.fontSize.md,
-    color: colors.textDark,
-    marginBottom: spacing.xs,
-  },
-  taskDate: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  taskHours: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  taskClient: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  taskRating: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text,
-    marginTop: spacing.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  taskPayment: {
-    fontSize: typography.fontSize.sm,
-    color: colors.success,
-    marginTop: spacing.xs,
-    fontWeight: typography.fontWeight.bold,
-  },
-  acceptButton: {
-    marginTop: spacing.md,
-  },
+  refreshText: { color: colors.primaryDark, fontWeight: typography.fontWeight.semibold },
 });
 
 export default CleanerDashboard;

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from 'react-nati
 import { useLanguage } from '../../contexts/LanguageContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../../components/Common/Button';
+import api from '../../utils/api';
 // Document picker removed - can be added later if needed
 
 const Careers = () => {
@@ -13,6 +14,8 @@ const Careers = () => {
     email: '',
     phone: '',
     address: '',
+    city: '',
+    zipCode: '',
     experience: '',
     description: '',
     cv: null,
@@ -39,27 +42,46 @@ const Careers = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.email || !formData.phone) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.address || formData.experience === '') {
       Alert.alert('Error', 'Please fill in all required fields.');
       return;
     }
 
     setLoading(true);
-    // In a real app, you would submit this to your API
-    setTimeout(() => {
+    try {
+      const response = await api.post('/jobseekers', {
+        name: formData.name.trim(),
+        email: formData.email.trim().toLowerCase(),
+        phone: formData.phone.trim(),
+        address: formData.address.trim(),
+        city: formData.city.trim(),
+        zipCode: formData.zipCode.trim(),
+        experience: parseInt(formData.experience, 10) || 0,
+        description: formData.description.trim(),
+      });
+
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Failed to submit application');
+      }
+
       Alert.alert('Success', 'Application submitted successfully!');
       setFormData({
         name: '',
         email: '',
         phone: '',
         address: '',
+        city: '',
+        zipCode: '',
         experience: '',
         description: '',
         cv: null,
       });
       setShowApplication(false);
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || error.message || 'Failed to submit application');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -135,7 +157,7 @@ const Careers = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('careers.address', 'Address')}</Text>
+              <Text style={styles.label}>{t('careers.address', 'Address')} *</Text>
               <TextInput
                 style={styles.input}
                 value={formData.address}
@@ -145,7 +167,27 @@ const Careers = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('careers.experience', 'Experience')}</Text>
+              <Text style={styles.label}>{t('auth.city', 'City')}</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.city}
+                onChangeText={(value) => handleChange('city', value)}
+                placeholder={t('auth.city', 'City')}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{t('auth.zipCode', 'Zip Code')}</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.zipCode}
+                onChangeText={(value) => handleChange('zipCode', value)}
+                placeholder={t('auth.zipCode', 'Zip Code')}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>{t('careers.experience', 'Experience')} *</Text>
               <TextInput
                 style={styles.input}
                 value={formData.experience}

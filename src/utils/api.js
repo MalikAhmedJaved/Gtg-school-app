@@ -2,10 +2,11 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create axios instance with base configuration
+// API URL is set via EXPO_PUBLIC_API_URL in the .env file at the project root.
+// To switch environments, edit .env and restart the dev server.
 const getApiBaseURL = () => {
-  // If custom API URL is set in environment variables, use it
-  // For React Native, you can use react-native-config or similar
-  return 'https://cleaning-website-backend-five.vercel.app/api';
+  const FALLBACK_URL = 'https://api.rentplus.dk/api';
+  return process.env.EXPO_PUBLIC_API_URL || FALLBACK_URL;
 };
 
 const api = axios.create({

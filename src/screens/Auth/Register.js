@@ -19,6 +19,8 @@ const Register = () => {
     password: '',
     phone: '',
     address: '',
+    city: '',
+    zipCode: '',
     role: 'client',
     clientType: 'private',
     companyName: '',
@@ -51,6 +53,8 @@ const Register = () => {
         password: formData.password,
         phone: formData.phone,
         address: formData.address,
+        city: formData.city || undefined,
+        zipCode: formData.zipCode || undefined,
         role: formData.role,
         ...(formData.role === 'client' && {
           clientType: formData.clientType,
@@ -64,10 +68,16 @@ const Register = () => {
       const response = await api.post('/auth/register', registrationData);
 
       if (response.data.success) {
-        showToast(t('auth.registerSuccess', 'Registration successful! Redirecting to login...'), 'success');
+        showToast(
+          t(
+            'auth.verifyEmailSent',
+            'Registration successful! Please check your email to verify your account, then log in.'
+          ),
+          'success'
+        );
         setTimeout(() => {
           navigation.navigate('Login');
-        }, 2000);
+        }, 3000);
       } else {
         Alert.alert('Error', response.data.message || t('auth.registerError', 'Registration failed.'));
       }
@@ -144,6 +154,27 @@ const Register = () => {
             onChangeText={(value) => handleChange('address', value)}
             placeholder={t('auth.address', 'Address')}
           />
+        </View>
+
+        <View style={styles.row}>
+          <View style={[styles.inputGroup, styles.halfWidth]}>
+            <Text style={styles.label}>{t('auth.city', 'City')}</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.city}
+              onChangeText={(value) => handleChange('city', value)}
+              placeholder={t('auth.city', 'City')}
+            />
+          </View>
+          <View style={[styles.inputGroup, styles.halfWidth]}>
+            <Text style={styles.label}>{t('auth.zipCode', 'Zip Code')}</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.zipCode}
+              onChangeText={(value) => handleChange('zipCode', value)}
+              placeholder={t('auth.zipCode', 'Zip Code')}
+            />
+          </View>
         </View>
 
         <View style={styles.inputGroup}>
@@ -255,6 +286,14 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: spacing.md,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  halfWidth: {
+    flex: 1,
   },
   label: {
     fontSize: typography.fontSize.sm,

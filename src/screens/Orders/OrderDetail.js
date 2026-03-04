@@ -1,21 +1,31 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES } from '../../utils/orderService';
 import SectionCard from '../../components/Common/SectionCard';
+import Button from '../../components/Common/Button';
+import { navigate as rootNavigate } from '../../utils/rootNavigation';
+import api from '../../utils/api';
 
-const OrderDetail = ({ route }) => {
+const OrderDetail = ({ route, navigation }) => {
   const { t } = useLanguage();
-  const { order } = route.params;
+  const { userRole } = useAuth();
+  const [order, setOrder] = useState(route.params.order);
+  const [accepting, setAccepting] = useState(false);
+
   const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
+  const canEditPending = userRole === 'client' && order.status === 'pending';
+  const canCleanerAccept = userRole === 'cleaner' && order.status === 'assigned';
 
   const renderList = (items, label) => {
     if (!items || items.length === 0) return null;
@@ -57,10 +67,46 @@ const OrderDetail = ({ route }) => {
     return renderList(items, t('newOrder.extraTargeted', 'Extra Targeted'));
   };
 
+  const startEdit = () => {
+    rootNavigate('NewOrderTab', {
+      screen: 'NewOrder',
+      params: {
+        editMode: true,
+        editOrder: order,
+      },
+    });
+  };
+
+  const handleAcceptTask = async () => {
+    const taskId = order.id || order._id;
+    if (!taskId) return;
+
+    setAccepting(true);
+    try {
+      const response = await api.post(`/tasks/${taskId}/accept`);
+      const updated = response.data?.data;
+
+      if (response.data?.success && updated) {
+        setOrder((prev) => ({
+          ...prev,
+          status: updated.status || 'accepted',
+          updatedAt: updated.updatedAt || prev.updatedAt,
+        }));
+        Alert.alert('Success', t('cleaner.taskAccepted', 'Task accepted successfully'));
+        rootNavigate('OrdersTab');
+      } else {
+        Alert.alert('Error', response.data?.message || 'Failed to accept task');
+      }
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to accept task');
+    } finally {
+      setAccepting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Status header */}
         <View style={styles.statusHeader}>
           <View style={[styles.statusBadgeLg, { backgroundColor: statusInfo.color + '20' }]}>
             <Text style={[styles.statusTextLg, { color: statusInfo.color }]}>
@@ -69,7 +115,24 @@ const OrderDetail = ({ route }) => {
           </View>
         </View>
 
-        {/* Service info */}
+        {canEditPending ? (
+          <View style={styles.actionBar}>
+            <Button title="Edit Pending Order" onPress={startEdit} variant="secondary" />
+          </View>
+        ) : null}
+
+        {canCleanerAccept ? (
+          <View style={styles.actionBar}>
+            <Button
+              title={accepting ? t('common.loading', 'Loading...') : t('cleaner.acceptTask', 'Accept Task')}
+              onPress={handleAcceptTask}
+              loading={accepting}
+              disabled={accepting}
+              variant="primary"
+            />
+          </View>
+        ) : null}
+
         <SectionCard title={t('newOrder.serviceType', 'Service Type')}>
           <Text style={styles.valueText}>
             {SERVICE_TYPES[order.serviceType] || order.serviceType}
@@ -84,36 +147,58 @@ const OrderDetail = ({ route }) => {
           )}
         </SectionCard>
 
-        {/* Booking details */}
+        {userRole === 'cleaner' && order.client ? (
+          <SectionCard title={t('cleaner.clientInfo', 'Client Information')}>
+            {order.client.name ? (
+              <View style={styles.detailRow}>
+                <Ionicons name="person-outline" size={18} color={colors.primary} />
+                <Text style={styles.detailValue}>{order.client.name}</Text>
+              </View>
+            ) : null}
+            {order.client.email ? (
+              <View style={styles.detailRow}>
+                <Ionicons name="mail-outline" size={18} color={colors.primary} />
+                <Text style={styles.detailValue}>{order.client.email}</Text>
+              </View>
+            ) : null}
+            {order.client.phone ? (
+              <View style={styles.detailRow}>
+                <Ionicons name="call-outline" size={18} color={colors.primary} />
+                <Text style={styles.detailValue}>{order.client.phone}</Text>
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
         <SectionCard title={t('newOrder.bookingDetails', 'Booking Details')}>
-          <View style={styles.detailRow}>
-            <Ionicons name="location-outline" size={18} color={colors.primary} />
-            <Text style={styles.detailValue}>{order.address || '—'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-            <Text style={styles.detailValue}>{order.date || '—'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="time-outline" size={18} color={colors.primary} />
-            <Text style={styles.detailValue}>{order.time || '—'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Ionicons name="hourglass-outline" size={18} color={colors.primary} />
-            <Text style={styles.detailValue}>
-              {order.calculatedHours || order.manualHours || '–'} {t('admin.hours', 'hours')}
-            </Text>
-          </View>
+          <>
+            <View style={styles.detailRow}>
+              <Ionicons name="location-outline" size={18} color={colors.primary} />
+              <Text style={styles.detailValue}>{order.address || '—'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+              <Text style={styles.detailValue}>{order.date || '—'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Ionicons name="time-outline" size={18} color={colors.primary} />
+              <Text style={styles.detailValue}>{order.time || '—'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Ionicons name="hourglass-outline" size={18} color={colors.primary} />
+              <Text style={styles.detailValue}>
+                {order.calculatedHours || order.manualHours || '–'} {t('admin.hours', 'hours')}
+              </Text>
+            </View>
+          </>
         </SectionCard>
 
-        {/* Checklist selections */}
         {renderList(order.asNeededSelections, t('newOrder.asNeeded', 'As Needed'))}
         {renderList(order.mainCleaningExtras, t('newOrder.mainCleaningExtras', 'Main Cleaning Extras'))}
         {renderList(order.adhocSelections, t('newOrder.adhocOptions', 'Ad hoc Options'))}
         {renderEquipment()}
         {renderExtra()}
 
-        {/* Comments */}
         {(order.comments || order.adhocFreeText) ? (
           <SectionCard title={t('newOrder.additionalComments', 'Comments')}>
             <Text style={styles.commentText}>
@@ -122,7 +207,6 @@ const OrderDetail = ({ route }) => {
           </SectionCard>
         ) : null}
 
-        {/* Order date */}
         {order.createdAt && (
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('orders.orderDate', 'Order Date')}</Text>
@@ -148,6 +232,9 @@ const styles = StyleSheet.create({
   },
   statusHeader: {
     alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  actionBar: {
     marginBottom: spacing.md,
   },
   statusBadgeLg: {

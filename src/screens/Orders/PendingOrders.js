@@ -31,12 +31,63 @@ const PendingOrders = ({ navigation }) => {
     t('cleanerChecklist.finalCheck', 'Do a final quality check before leaving the location.'),
   ];
 
+  const groupRecurringClientOrders = (items) => {
+    const groups = new Map();
+    const singles = [];
+
+    (Array.isArray(items) ? items : []).forEach((task) => {
+      const groupId = task.recurrenceGroupId;
+      if (!groupId) {
+        singles.push({ ...task, recurrenceCount: task.recurrenceCount || 1, isRecurring: Boolean(task.isRecurring) });
+        return;
+      }
+
+      const key = String(groupId);
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, {
+          ...task,
+          isRecurring: true,
+          recurrenceCount: 1,
+          _count: 1,
+        });
+        return;
+      }
+
+      existing._count += 1;
+      existing.recurrenceCount = Math.max(existing.recurrenceCount || 1, existing._count, task.recurrenceCount || 1);
+
+      const existingDate = existing.date ? new Date(existing.date) : null;
+      const candidateDate = task.date ? new Date(task.date) : null;
+      if (candidateDate && (!existingDate || candidateDate < existingDate)) {
+        Object.assign(existing, {
+          ...task,
+          isRecurring: true,
+          recurrenceCount: existing.recurrenceCount,
+          _count: existing._count,
+        });
+      }
+    });
+
+    const grouped = Array.from(groups.values()).map((task) => {
+      const normalized = { ...task };
+      delete normalized._count;
+      return normalized;
+    });
+
+    return [...grouped, ...singles].sort((a, b) => {
+      const ad = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bd = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bd - ad;
+    });
+  };
+
   const fetchOrders = useCallback(async () => {
     try {
       const data = await getOrders({ status: isCleaner ? 'assigned' : 'pending' });
       const filteredData = isCleaner
         ? (Array.isArray(data) ? data.filter((task) => task.status === 'assigned') : [])
-        : data;
+        : groupRecurringClientOrders(data);
       setOrders(filteredData);
     } catch (error) {
       console.error('Error fetching pending orders:', error);
@@ -79,6 +130,15 @@ const PendingOrders = ({ navigation }) => {
         {item.cleaningCategory && (
           <Text style={styles.category}>{CLEANING_CATEGORIES[item.cleaningCategory]}</Text>
         )}
+        {item.isRecurring ? (
+          <View style={styles.recurringBadge}>
+            <Ionicons name="repeat" size={13} color={colors.primaryDark} />
+            <Text style={styles.recurringText}>
+              {`Recurring every ${item.recurrenceEvery ?? 1} week(s)`}
+              {item.recurrenceCount ? ` (${item.recurrenceCount} tasks)` : ''}
+            </Text>
+          </View>
+        ) : null}
         <View style={styles.detailRow}>
           <Ionicons name="location-outline" size={15} color={colors.textLight} />
           <Text style={styles.detailText} numberOfLines={1}>{item.address || '—'}</Text>
@@ -184,6 +244,22 @@ const styles = StyleSheet.create({
   statusBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.full },
   statusText: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.bold, textTransform: 'uppercase' },
   category: { fontSize: typography.fontSize.sm, color: colors.primary, marginBottom: spacing.xs },
+  recurringBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primaryLight,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    marginBottom: spacing.xs,
+  },
+  recurringText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.primaryDark,
+    fontWeight: typography.fontWeight.semibold,
+    marginLeft: 4,
+  },
   detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
   detailText: { fontSize: typography.fontSize.sm, color: colors.textLight, marginLeft: spacing.xs, flex: 1 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl },

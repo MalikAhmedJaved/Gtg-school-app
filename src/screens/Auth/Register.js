@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useToast } from '../../contexts/ToastContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../../components/Common/Button';
 import Logo from '../../components/Common/Logo';
@@ -12,7 +11,6 @@ import api from '../../utils/api';
 const Register = () => {
   const { t } = useLanguage();
   const navigation = useNavigation();
-  const { showToast } = useToast();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -27,6 +25,7 @@ const Register = () => {
     vatNumber: '',
   });
   const [loading, setLoading] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -68,16 +67,7 @@ const Register = () => {
       const response = await api.post('/auth/register', registrationData);
 
       if (response.data.success) {
-        showToast(
-          t(
-            'auth.verifyEmailSent',
-            'Registration successful! Please check your email to verify your account, then log in.'
-          ),
-          'success'
-        );
-        setTimeout(() => {
-          navigation.navigate('Login');
-        }, 3000);
+        setRegistrationSuccess(true);
       } else {
         Alert.alert('Error', response.data.message || t('auth.registerError', 'Registration failed.'));
       }
@@ -92,14 +82,60 @@ const Register = () => {
     }
   };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.logoContainer}>
-        <Logo width={100} height={100} />
-      </View>
+  if (registrationSuccess) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.contentContainer}
+        >
+          <View style={styles.logoContainer}>
+            <Logo width={100} height={100} />
+          </View>
+          <View style={styles.successContainer}>
+            <Text style={styles.successIcon}>✉️</Text>
+            <Text style={styles.successTitle}>
+              {t('auth.registrationSuccessTitle', 'Registration Successful!')}
+            </Text>
+            <Text style={styles.successMessage}>
+              {t(
+                'auth.verifyEmailSent',
+                'We have sent a verification email to your inbox. Please check your email and click the verification link before logging in.'
+              )}
+            </Text>
+            <Text style={styles.successEmail}>{formData.email}</Text>
+            <Button
+              title={t('auth.goToLogin', 'Go to Login')}
+              onPress={() => navigation.navigate('Login')}
+              variant="primary"
+              style={styles.goToLoginButton}
+            />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
-      <View style={styles.formContainer}>
-        <Text style={styles.title}>{t('auth.register', 'Register')}</Text>
+  return (
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.contentContainer}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
+          scrollEnabled
+          nestedScrollEnabled
+        >
+          <View style={styles.logoContainer}>
+            <Logo width={100} height={100} />
+          </View>
+
+          <View style={styles.formContainer}>
+            <Text style={styles.title}>{t('auth.register', 'Register')}</Text>
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>{t('auth.fullName', 'Full Name')} *</Text>
@@ -177,85 +213,87 @@ const Register = () => {
           </View>
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('auth.registerAs', 'Register as')} *</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={formData.role}
-              onValueChange={(value) => handleChange('role', value)}
-              style={styles.picker}
-              mode="dropdown"
-            >
-              <Picker.Item label={t('auth.client', 'Client')} value="client" />
-              <Picker.Item label={t('auth.cleaner', 'Cleaner')} value="cleaner" />
-            </Picker>
-          </View>
-        </View>
-
-        {formData.role === 'client' && (
-          <>
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('auth.clientType', 'Client Type')} *</Text>
+              <Text style={styles.label}>{t('auth.registerAs', 'Register as')} *</Text>
               <View style={styles.pickerContainer}>
                 <Picker
-                  selectedValue={formData.clientType}
-                  onValueChange={(value) => handleChange('clientType', value)}
+                  selectedValue={formData.role}
+                  onValueChange={(value) => handleChange('role', value)}
                   style={styles.picker}
                   mode="dropdown"
                 >
-                  <Picker.Item label={t('auth.private', 'Private')} value="private" />
-                  <Picker.Item label={t('auth.company', 'Company')} value="company" />
+                  <Picker.Item label={t('auth.client', 'Client')} value="client" />
+                  <Picker.Item label={t('auth.cleaner', 'Cleaner')} value="cleaner" />
                 </Picker>
               </View>
             </View>
 
-            {formData.clientType === 'company' && (
+            {formData.role === 'client' && (
               <>
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('auth.companyName', 'Company Name')} *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.companyName}
-                    onChangeText={(value) => handleChange('companyName', value)}
-                    placeholder={t('auth.companyName', 'Company Name')}
-                  />
+                  <Text style={styles.label}>{t('auth.clientType', 'Client Type')} *</Text>
+                  <View style={styles.pickerContainer}>
+                    <Picker
+                      selectedValue={formData.clientType}
+                      onValueChange={(value) => handleChange('clientType', value)}
+                      style={styles.picker}
+                      mode="dropdown"
+                    >
+                      <Picker.Item label={t('auth.private', 'Private')} value="private" />
+                      <Picker.Item label={t('auth.company', 'Company')} value="company" />
+                    </Picker>
+                  </View>
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('auth.vatNumber', 'VAT Number')} *</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={formData.vatNumber}
-                    onChangeText={(value) => handleChange('vatNumber', value)}
-                    placeholder={t('auth.vatNumber', 'VAT Number')}
-                  />
-                </View>
+                {formData.clientType === 'company' && (
+                  <>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>{t('auth.companyName', 'Company Name')} *</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={formData.companyName}
+                        onChangeText={(value) => handleChange('companyName', value)}
+                        placeholder={t('auth.companyName', 'Company Name')}
+                      />
+                    </View>
+
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.label}>{t('auth.vatNumber', 'VAT Number')} *</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={formData.vatNumber}
+                        onChangeText={(value) => handleChange('vatNumber', value)}
+                        placeholder={t('auth.vatNumber', 'VAT Number')}
+                      />
+                    </View>
+                  </>
+                )}
               </>
             )}
-          </>
-        )}
 
-        <Button
-          title={loading ? t('common.loading', 'Loading...') : t('auth.register', 'Register')}
-          onPress={handleSubmit}
-          loading={loading}
-          variant="primary"
-          style={styles.submitButton}
-        />
+            <Button
+              title={loading ? t('common.loading', 'Loading...') : t('auth.register', 'Register')}
+              onPress={handleSubmit}
+              loading={loading}
+              variant="primary"
+              style={styles.submitButton}
+            />
 
-        <View style={styles.loginLink}>
-          <Text style={styles.loginText}>
-            {t('auth.alreadyHaveAccount', 'Already have an account?')}{' '}
-          </Text>
-          <Text
-            style={styles.loginLinkText}
-            onPress={() => navigation.navigate('Login')}
-          >
-            {t('auth.login', 'Login')}
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+            <View style={styles.loginLink}>
+              <Text style={styles.loginText}>
+                {t('auth.alreadyHaveAccount', 'Already have an account?')}{' '}
+              </Text>
+              <Text
+                style={styles.loginLinkText}
+                onPress={() => navigation.navigate('Login')}
+              >
+                {t('auth.login', 'Login')}
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -264,9 +302,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  keyboardContainer: {
+    flex: 1,
+    minHeight: 0,
+  },
+  scrollView: {
+    flex: 1,
+    minHeight: 0,
+  },
   contentContainer: {
-    flexGrow: 1,
     padding: spacing.xl,
+    paddingBottom: spacing.xxl,
   },
   logoContainer: {
     alignItems: 'center',
@@ -335,6 +381,40 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.primary,
     fontWeight: typography.fontWeight.semibold,
+  },
+  successContainer: {
+    backgroundColor: colors.white,
+    padding: spacing.xl,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+  },
+  successIcon: {
+    fontSize: 48,
+    marginBottom: spacing.md,
+  },
+  successTitle: {
+    fontSize: typography.fontSize.xxl,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.success || '#16a34a',
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  successMessage: {
+    fontSize: typography.fontSize.md,
+    color: colors.text,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: spacing.md,
+  },
+  successEmail: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+  },
+  goToLoginButton: {
+    width: '100%',
   },
 });
 

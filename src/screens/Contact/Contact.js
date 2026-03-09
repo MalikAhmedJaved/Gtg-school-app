@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../../components/Common/Button';
@@ -40,7 +40,12 @@ const Contact = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
         <Text style={styles.title}>{t('contact.title', 'Contact Us')}</Text>
         <Text style={styles.subtitle}>{t('contact.subtitle', 'Get in touch with us today')}</Text>
@@ -149,7 +154,9 @@ const Contact = () => {
           />
         </View>
       </View>
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 

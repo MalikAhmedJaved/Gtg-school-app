@@ -48,30 +48,85 @@ const mapCleaningType = (serviceType, cleaningCategory) => {
   return 'residential';
 };
 
-// Map backend task data to mobile app order format (for display)
-const mapTaskToOrder = (task) => ({
-  _id: String(task.id),
-  id: task.id,
-  serviceType: task.cleaningType === 'residential' ? 'home' : task.cleaningType === 'move' ? 'moveinout' : task.cleaningType,
-  cleaningType: task.cleaningType,
-  address: task.address,
-  date: task.date,
-  time: task.time,
-  hours: task.hours,
-  calculatedHours: task.hours,
-  comments: task.comments,
-  status: task.status,
-  client: task.client,
-  cleaner: task.cleaner,
-  rating: task.rating,
-  ratingComment: task.ratingComment,
-  createdAt: task.createdAt,
-  updatedAt: task.updatedAt,
-  completedAt: task.completedAt,
-  cancelledAt: task.cancelledAt,
-  frequency: task.frequency,
-  checklist: task.checklist,
-});
+// Map backend task data to mobile app order format (for display/edit)
+const KNOWN_AS_NEEDED = ['wipingFrames', 'limeShower', 'vacuumFurniture', 'cobwebs'];
+const KNOWN_MAIN_EXTRAS = [
+  'wipingFrames', 'wipingWindowEdges', 'wipingCeilingEdges', 'windowCleaning',
+  'blindsCleaned', 'furnitureVacuumed', 'behindFurniture', 'cleaningWallsCeilings',
+  'underCarpets', 'mirrorsGlass', 'ceilingLights', 'closedSpaces',
+  'insideCupboards', 'woodenFloors', 'ovenFridge',
+];
+const KNOWN_ADHOC = ['standardWithout', 'vacuumAndFloor', 'bathroomAndFloor', 'largeHome'];
+const KNOWN_EXTRA_TARGETED = ['animalHair', 'smoking'];
+const EQUIPMENT_PREFIX = 'equipment:';
+const EQUIPMENT_KEYS = ['cleaningAgents', 'cloth', 'vacuumCleaner', 'mop', 'specialProducts'];
+
+const mapTaskToOrder = (task) => {
+  const cleaningType = task.cleaningType;
+  const serviceType = cleaningType === 'residential'
+    ? 'home'
+    : cleaningType === 'move'
+      ? 'moveinout'
+      : cleaningType === 'deep'
+        ? 'home'
+        : cleaningType;
+  const cleaningCategory = cleaningType === 'deep' ? 'main' : 'standard';
+
+  const checklist = Array.isArray(task.checklist) ? task.checklist : [];
+
+  const allKnown = new Set([
+    ...KNOWN_AS_NEEDED, ...KNOWN_MAIN_EXTRAS, ...KNOWN_ADHOC, ...KNOWN_EXTRA_TARGETED,
+  ]);
+  const equipment = {};
+  EQUIPMENT_KEYS.forEach((k) => { equipment[k] = checklist.includes(`${EQUIPMENT_PREFIX}${k}`); });
+  const checklistItems = checklist.filter(
+    (item) => typeof item === 'string' && !allKnown.has(item) && !item.startsWith(EQUIPMENT_PREFIX)
+  );
+
+  return {
+    _id: String(task.id || task._id || ''),
+    id: task.id,
+    title: task.title || '',
+    serviceType,
+    cleaningCategory,
+    cleaningType,
+    address: task.address,
+    date: task.date,
+    time: task.time,
+    endTime: task.endTime || null,
+    allDay: Boolean(task.allDay),
+    frequency: task.frequency,
+    recurrenceEvery: task.recurrenceEvery,
+    recurrenceDays: Array.isArray(task.recurrenceDays) ? task.recurrenceDays : [],
+    recurrenceUntil: task.recurrenceUntil || null,
+    recurrenceGroupId: task.recurrenceGroupId || null,
+    isRecurring: Boolean(task.isRecurring || task.recurrenceGroupId),
+    recurrenceCount: task.recurrenceCount || null,
+    hours: task.hours,
+    manualHours: task.hours,
+    calculatedHours: task.hours,
+    comments: task.comments,
+    status: task.status,
+    checklist,
+    checklistItems,
+    asNeededSelections: checklist.filter((item) => KNOWN_AS_NEEDED.includes(item)),
+    mainCleaningExtras: checklist.filter((item) => KNOWN_MAIN_EXTRAS.includes(item)),
+    adhocSelections: checklist.filter((item) => KNOWN_ADHOC.includes(item)),
+    extraTargeted: {
+      animalHair: checklist.includes('animalHair'),
+      smoking: checklist.includes('smoking'),
+    },
+    equipment,
+    client: task.client,
+    cleaner: task.cleaner,
+    rating: task.rating,
+    ratingComment: task.ratingComment,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    completedAt: task.completedAt,
+    cancelledAt: task.cancelledAt,
+  };
+};
 
 // Map mobile app order data to backend task format (for creation)
 const mapOrderToTask = (orderData) => {

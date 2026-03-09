@@ -11,7 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
-import { SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES } from '../../utils/orderService';
+import { SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES, getOrderById } from '../../utils/orderService';
 import SectionCard from '../../components/Common/SectionCard';
 import Button from '../../components/Common/Button';
 import { navigate as rootNavigate } from '../../utils/rootNavigation';
@@ -67,12 +67,27 @@ const OrderDetail = ({ route, navigation }) => {
     return renderList(items, t('newOrder.extraTargeted', 'Extra Targeted'));
   };
 
-  const startEdit = () => {
+  const startEdit = async () => {
+    const taskId = order.id || order._id;
+    let editPayload = order;
+
+    if (taskId) {
+      try {
+        const latest = await getOrderById(taskId);
+        if (latest) {
+          editPayload = latest;
+          setOrder(latest);
+        }
+      } catch {
+        // Fall back to currently loaded order if refresh fails.
+      }
+    }
+
     rootNavigate('NewOrderTab', {
       screen: 'NewOrder',
       params: {
         editMode: true,
-        editOrder: order,
+        editOrder: editPayload,
       },
     });
   };
@@ -170,6 +185,37 @@ const OrderDetail = ({ route, navigation }) => {
           </SectionCard>
         ) : null}
 
+        {order.isRecurring ? (
+          <SectionCard title={t('orders.recurringInfo', 'Recurring Information')}>
+            <View style={styles.detailRow}>
+              <Ionicons name="repeat" size={18} color={colors.primary} />
+              <Text style={styles.detailValue}>
+                Every {order.recurrenceEvery ?? 1} week(s){order.recurrenceCount ? ` (${order.recurrenceCount} tasks)` : ''}
+              </Text>
+            </View>
+            {Array.isArray(order.recurrenceDays) && order.recurrenceDays.length > 0 ? (
+              <View style={styles.detailRow}>
+                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                <Text style={styles.detailValue}>
+                  {order.recurrenceDays.map(d => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d] || d).join(', ')}
+                </Text>
+              </View>
+            ) : null}
+            {order.recurrenceUntil ? (
+              <View style={styles.detailRow}>
+                <Ionicons name="flag-outline" size={18} color={colors.primary} />
+                <Text style={styles.detailValue}>Until {order.recurrenceUntil}</Text>
+              </View>
+            ) : null}
+          </SectionCard>
+        ) : null}
+
+        {order.title ? (
+          <SectionCard title={t('orders.title', 'Title')}>
+            <Text style={styles.valueText}>{order.title}</Text>
+          </SectionCard>
+        ) : null}
+
         <SectionCard title={t('newOrder.bookingDetails', 'Booking Details')}>
           <>
             <View style={styles.detailRow}>
@@ -182,7 +228,11 @@ const OrderDetail = ({ route, navigation }) => {
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="time-outline" size={18} color={colors.primary} />
-              <Text style={styles.detailValue}>{order.time || '—'}</Text>
+              <Text style={styles.detailValue}>
+                {order.allDay
+                  ? t('orders.allDay', 'All Day')
+                  : `${order.time || '—'}${order.endTime ? ` – ${order.endTime}` : ''}`}
+              </Text>
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="hourglass-outline" size={18} color={colors.primary} />
@@ -198,6 +248,8 @@ const OrderDetail = ({ route, navigation }) => {
         {renderList(order.adhocSelections, t('newOrder.adhocOptions', 'Ad hoc Options'))}
         {renderEquipment()}
         {renderExtra()}
+
+        {renderList(order.checklistItems, t('client.whatNeedsToBeDone', 'What needs to be done'))}
 
         {(order.comments || order.adhocFreeText) ? (
           <SectionCard title={t('newOrder.additionalComments', 'Comments')}>

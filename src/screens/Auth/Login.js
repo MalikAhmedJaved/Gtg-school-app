@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -81,12 +81,11 @@ const Login = () => {
       const errorMessage = error.response?.data?.message;
       const statusCode = error.response?.status;
 
-      if (errorCode === 'EMAIL_NOT_VERIFIED') {
+      if (errorCode === 'EMAIL_NOT_VERIFIED' || statusCode === 403 || /verify|verification/i.test(errorMessage || '')) {
         // Show resend verification option
         setResendEmail(formData.email.trim().toLowerCase());
         setShowResendVerification(true);
-        Alert.alert(
-          t('auth.emailNotVerified', 'Email Not Verified'),
+        setLoginError(
           t('auth.emailNotVerifiedMsg', 'Please verify your email address before logging in. Check your inbox or use the resend option below.')
         );
       } else {
@@ -107,7 +106,16 @@ const Login = () => {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.contentContainer}
+          keyboardShouldPersistTaps="handled"
+        >
       <View style={styles.logoContainer}>
         <Logo width={120} height={120} />
       </View>
@@ -184,7 +192,9 @@ const Login = () => {
           </Text>
         </View>
       </View>
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -197,6 +207,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: spacing.xl,
+    paddingBottom: 40,
   },
   logoContainer: {
     alignItems: 'center',

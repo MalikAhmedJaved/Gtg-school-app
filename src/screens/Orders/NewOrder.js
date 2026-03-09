@@ -54,6 +54,74 @@ const DEFAULT_EVENT_FORM = {
   comments: '',
 };
 
+const shiftCalendarDate = (baseDate, mode, direction) => {
+  const next = new Date(baseDate);
+  if (mode === 'month') {
+    next.setMonth(next.getMonth() + direction);
+    return next;
+  }
+  if (mode === 'week') {
+    next.setDate(next.getDate() + (7 * direction));
+    return next;
+  }
+  next.setDate(next.getDate() + direction);
+  return next;
+};
+
+const formatLocalDateISO = (date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const getRecurringPreviewDates = (startDateStr, recurrenceDays, recurrenceUntil, recurrenceEvery = 1) => {
+  if (!startDateStr) return [];
+
+  const start = new Date(`${startDateStr}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return [];
+
+  const validDays = Array.isArray(recurrenceDays)
+    ? [...new Set(recurrenceDays.map((d) => parseInt(d, 10)).filter((d) => d >= 0 && d <= 6))]
+    : [];
+
+  if (validDays.length === 0) {
+    return [start];
+  }
+
+  const until = recurrenceUntil
+    ? new Date(`${recurrenceUntil}T23:59:59`)
+    : (() => {
+      const d = new Date(start);
+      d.setFullYear(d.getFullYear() + 1);
+      d.setHours(23, 59, 59, 999);
+      return d;
+    })();
+
+  const intervalWeeks = Math.max(1, parseInt(recurrenceEvery, 10) || 1);
+  const results = [];
+
+  validDays.forEach((dayOfWeek) => {
+    const first = new Date(start);
+    const dayOffset = (dayOfWeek - start.getDay() + 7) % 7;
+    first.setDate(first.getDate() + dayOffset);
+
+    for (let weekIndex = 0; weekIndex < 160; weekIndex += 1) {
+      const candidate = new Date(first);
+      candidate.setDate(candidate.getDate() + (weekIndex * 7 * intervalWeeks));
+      if (candidate > until) break;
+      results.push(candidate);
+    }
+  });
+
+  const dedupedByDate = new Map();
+  results.forEach((date) => {
+    dedupedByDate.set(formatLocalDateISO(date), date);
+  });
+
+  return Array.from(dedupedByDate.values()).sort((a, b) => a - b);
+};
+
 const NewOrder = ({ navigation, route }) => {
   const { t } = useLanguage();
   const { isAuthenticated, userRole, userData } = useAuth();
@@ -75,15 +143,22 @@ const NewOrder = ({ navigation, route }) => {
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarMode, setCalendarMode] = useState('month');
+  const [calendarDate, setCalendarDate] = useState(new Date());
   const [eventForm, setEventForm] = useState(DEFAULT_EVENT_FORM);
+  const [savedEventData, setSavedEventData] = useState(null);
+  const [bookingPreviewEventId] = useState('booking-preview-event');
   const [checklistInput, setChecklistInput] = useState('');
   const [eventError, setEventError] = useState('');
+  const [bookingValidationError, setBookingValidationError] = useState('');
   const [hasBookingEvent, setHasBookingEvent] = useState(false);
   const [showNativeDatePicker, setShowNativeDatePicker] = useState(false);
   const [showNativeStartTimePicker, setShowNativeStartTimePicker] = useState(false);
   const [showNativeEndTimePicker, setShowNativeEndTimePicker] = useState(false);
   const [showNativeUntilDatePicker, setShowNativeUntilDatePicker] = useState(false);
   const estimatedHours = useMemo(() => calculateHours(order), [order]);
+  const calendarTitle = useMemo(() => (
+    calendarDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  ), [calendarDate]);
   const modalWidth = Math.min(width - 16, 560);
   const webInputStyle = {
     width: '100%',
@@ -258,6 +333,14 @@ const NewOrder = ({ navigation, route }) => {
     setEventForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const stepRecurrenceEvery = (delta) => {
+    setEventForm((prev) => {
+      const current = Number.isFinite(Number(prev.recurrenceEvery)) ? Number(prev.recurrenceEvery) : 0;
+      const next = Math.max(0, current + delta);
+      return { ...prev, recurrenceEvery: next };
+    });
+  };
+
   const addChecklistItem = () => {
     const trimmed = checklistInput.trim();
     if (!trimmed) return;
@@ -323,6 +406,7 @@ const NewOrder = ({ navigation, route }) => {
           }
 
           return {
+            id: `task-${task.id || task._id || `${task.date}-${task.time}`}`,
             title: task.title || task.address || task.cleaningType || 'Event',
             start,
             end,
@@ -355,60 +439,115 @@ const NewOrder = ({ navigation, route }) => {
       return;
     }
 
+    if (eventForm.recurring && (!Array.isArray(eventForm.recurrenceDays) || eventForm.recurrenceDays.length === 0)) {
+      setEventError(t('scheduling.selectRecurrenceDays', 'Please select at least one weekday for recurrence'));
+      return;
+    }
+
     const [startHour, startMinute] = eventForm.startTime.split(':').map(Number);
     const [endHour, endMinute] = (eventForm.endTime || eventForm.startTime).split(':').map(Number);
     const durationHours = eventForm.allDay
       ? 8
       : Math.max(0.5, ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60);
 
+    if (!eventForm.allDay && (endHour * 60 + endMinute) <= (startHour * 60 + startMinute)) {
+      setEventError(t('scheduling.invalidTimeRange', 'End time must be after start time'));
+      return;
+    }
+
     const service = mapServiceFromCleaningType(eventForm.cleaningType);
+    const normalizedEvent = {
+      title: eventForm.title.trim(),
+      date: eventForm.date,
+      startTime: eventForm.startTime,
+      endTime: eventForm.endTime,
+      allDay: Boolean(eventForm.allDay),
+      recurring: Boolean(eventForm.recurring),
+      recurrenceEvery: parseInt(eventForm.recurrenceEvery ?? 1, 10) || 0,
+      recurrenceDays: Array.isArray(eventForm.recurrenceDays) ? eventForm.recurrenceDays : [],
+      recurrenceUntil: eventForm.recurrenceUntil || '',
+      address: eventForm.address.trim(),
+      cleaningType: eventForm.cleaningType,
+      checklistItems: Array.isArray(eventForm.checklistItems) ? eventForm.checklistItems.filter(Boolean) : [],
+      comments: eventForm.comments.trim(),
+    };
 
     setOrder((prev) => ({
       ...prev,
       serviceType: service.serviceType,
       cleaningCategory: service.cleaningCategory,
-      address: eventForm.address.trim(),
-      date: eventForm.date,
-      time: eventForm.allDay ? '09:00' : eventForm.startTime,
+      address: normalizedEvent.address,
+      date: normalizedEvent.date,
+      time: normalizedEvent.allDay ? '09:00' : normalizedEvent.startTime,
       manualHours: durationHours,
-      comments: eventForm.comments.trim(),
+      comments: normalizedEvent.comments,
     }));
 
-    const eventStart = new Date(`${eventForm.date}T${eventForm.allDay ? '09:00' : eventForm.startTime}:00`);
-    const eventEnd = new Date(`${eventForm.date}T${eventForm.allDay ? '17:00' : eventForm.endTime}:00`);
+    const previewDates = normalizedEvent.recurring
+      ? getRecurringPreviewDates(
+        normalizedEvent.date,
+        normalizedEvent.recurrenceDays,
+        normalizedEvent.recurrenceUntil,
+        normalizedEvent.recurrenceEvery
+      )
+      : [new Date(`${normalizedEvent.date}T00:00:00`)];
+
+    const previewEvents = previewDates.map((dateValue, index) => {
+      const day = formatLocalDateISO(dateValue);
+      const start = new Date(`${day}T${normalizedEvent.allDay ? '09:00' : normalizedEvent.startTime}:00`);
+      const end = new Date(`${day}T${normalizedEvent.allDay ? '17:00' : normalizedEvent.endTime}:00`);
+      return {
+        id: `${bookingPreviewEventId}-${index}`,
+        title: normalizedEvent.title || normalizedEvent.address,
+        start,
+        end,
+        color: colors.primary,
+      };
+    });
 
     setCalendarEvents((prev) => ([
-      ...prev,
-      {
-        title: eventForm.title.trim() || eventForm.address.trim(),
-        start: eventStart,
-        end: eventEnd,
-        color: colors.primary,
-      },
+      ...prev.filter((event) => !String(event.id || '').startsWith(bookingPreviewEventId)),
+      ...previewEvents,
     ]));
 
+    setSavedEventData(normalizedEvent);
+    setBookingValidationError('');
+    if (previewEvents.length > 0) {
+      setCalendarDate(previewEvents[0].start);
+    }
     setHasBookingEvent(true);
     setShowNewEvent(false);
-    setEventForm(DEFAULT_EVENT_FORM);
     setChecklistInput('');
   };
 
   const handleOpenEventModal = () => {
     setEventError('');
+    setBookingValidationError('');
+    const source = savedEventData || eventForm;
     setEventForm((prev) => ({
       ...prev,
-      title: prev.title || order.address || '',
-      date: order.date || prev.date || new Date().toISOString().slice(0, 10),
-      startTime: order.time || prev.startTime || '09:00',
-      endTime: order.time || prev.endTime || '09:30',
-      address: order.address || prev.address,
-      cleaningType: mapCleaningType(order.serviceType, order.cleaningCategory),
-      comments: order.comments || prev.comments,
+      ...source,
+      title: source.title || order.address || '',
+      date: order.date || source.date || new Date().toISOString().slice(0, 10),
+      startTime: order.time || source.startTime || '09:00',
+      endTime: source.endTime || order.time || source.startTime || '09:30',
+      address: order.address || source.address,
+      cleaningType: source.cleaningType || mapCleaningType(order.serviceType, order.cleaningCategory),
+      comments: order.comments || source.comments,
     }));
     setShowNewEvent(true);
   };
 
   const handleSubmit = async () => {
+    if (!hasBookingEvent) {
+      setBookingValidationError(
+        t('scheduling.bookingDetailsRequired', 'Please add booking details first by creating a new event.')
+      );
+      return;
+    }
+
+    setBookingValidationError('');
+
     if (!order.address.trim()) {
       Alert.alert('', t('newOrder.addressRequired', 'Please enter your address'));
       return;
@@ -424,15 +563,31 @@ const NewOrder = ({ navigation, route }) => {
 
     setSubmitting(true);
     try {
+      const booking = savedEventData || eventForm;
+      const parsedManualHours = parseFloat(order.manualHours);
+      const resolvedHours = Number.isFinite(parsedManualHours) && parsedManualHours > 0
+        ? parsedManualHours
+        : estimatedHours;
+      const payloadChecklist = [
+        ...buildChecklist(),
+        ...(Array.isArray(booking.checklistItems) ? booking.checklistItems.filter(Boolean) : []),
+      ];
+
       const payload = {
+        title: booking.title || '',
         address: order.address || '',
         date: order.date,
         time: order.time,
-        hours: estimatedHours,
+        endTime: booking.allDay ? '17:00' : (booking.endTime || null),
+        allDay: Boolean(booking.allDay),
+        hours: resolvedHours,
         cleaningType: mapCleaningType(order.serviceType, order.cleaningCategory),
-        frequency: 'once',
+        frequency: booking.recurring ? 'weekly' : 'once',
+        recurrenceEvery: booking.recurring ? (parseInt(booking.recurrenceEvery ?? 1, 10) || 0) : null,
+        recurrenceDays: booking.recurring ? (booking.recurrenceDays || []) : null,
+        recurrenceUntil: booking.recurring ? (booking.recurrenceUntil || null) : null,
         comments: order.comments || '',
-        checklist: buildChecklist(),
+        checklist: [...new Set(payloadChecklist)],
       };
 
       if (isEditMode) {
@@ -530,6 +685,11 @@ const NewOrder = ({ navigation, route }) => {
   ]);
   const [newAlwaysIncludedItem, setNewAlwaysIncludedItem] = useState('');
   const [newAsNeededItem, setNewAsNeededItem] = useState('');
+  const [newServiceValue, setNewServiceValue] = useState('');
+  const [newServiceLabel, setNewServiceLabel] = useState('');
+  const [newCategoryValue, setNewCategoryValue] = useState('');
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [newCategoryDesc, setNewCategoryDesc] = useState('');
 
   // --- Main cleaning extra items ---
   const mainExtraItems = [
@@ -569,10 +729,41 @@ const NewOrder = ({ navigation, route }) => {
     setServiceTypeOptions((prev) => prev.map((item) => (item.value === value ? { ...item, label } : item)));
   };
 
+  const REQUIRED_SERVICE_VALUES = ['home', 'commercial', 'moveinout'];
+  const addServiceType = () => {
+    const value = newServiceValue.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const label = newServiceLabel.trim();
+    if (!value || !label) return;
+    if (serviceTypeOptions.some((o) => o.value === value)) return;
+    setServiceTypeOptions((prev) => [...prev, { value, label }]);
+    setNewServiceValue('');
+    setNewServiceLabel('');
+  };
+  const removeServiceType = (value) => {
+    setServiceTypeOptions((prev) => prev.filter((o) => o.value !== value));
+    if (order.serviceType === value) updateOrder('serviceType', 'home');
+  };
+
   const updateCleaningCategoryField = (value, field, fieldValue) => {
     setCleaningCategoryOptions((prev) =>
       prev.map((item) => (item.value === value ? { ...item, [field]: fieldValue } : item))
     );
+  };
+
+  const REQUIRED_CATEGORY_VALUES = ['standard', 'main', 'adhoc'];
+  const addCleaningCategory = () => {
+    const value = newCategoryValue.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const label = newCategoryLabel.trim();
+    if (!value || !label) return;
+    if (cleaningCategoryOptions.some((o) => o.value === value)) return;
+    setCleaningCategoryOptions((prev) => [...prev, { value, label, description: newCategoryDesc.trim() }]);
+    setNewCategoryValue('');
+    setNewCategoryLabel('');
+    setNewCategoryDesc('');
+  };
+  const removeCleaningCategory = (value) => {
+    setCleaningCategoryOptions((prev) => prev.filter((o) => o.value !== value));
+    if (order.cleaningCategory === value) updateOrder('cleaningCategory', 'standard');
   };
 
   const updateAlwaysIncludedLabel = (index, label) => {
@@ -707,7 +898,7 @@ const NewOrder = ({ navigation, route }) => {
       title: editOrder.title || editOrder.address || '',
       date: hydrated.date || prev.date,
       startTime: hydrated.time || prev.startTime,
-      endTime: hydrated.time || prev.endTime,
+      endTime: editOrder.endTime || hydrated.time || prev.endTime,
       address: hydrated.address || prev.address,
       cleaningType: editOrder.cleaningType || prev.cleaningType,
       checklistItems: (Array.isArray(editOrder.checklist) ? editOrder.checklist : []).filter(
@@ -715,6 +906,24 @@ const NewOrder = ({ navigation, route }) => {
       ),
       comments: hydrated.comments || prev.comments,
     }));
+
+    setSavedEventData({
+      title: editOrder.title || editOrder.address || '',
+      date: hydrated.date || new Date().toISOString().slice(0, 10),
+      startTime: hydrated.time || '09:00',
+      endTime: editOrder.endTime || hydrated.time || '09:30',
+      allDay: Boolean(editOrder.allDay),
+      recurring: Array.isArray(editOrder.recurrenceDays) && editOrder.recurrenceDays.length > 0,
+      recurrenceEvery: parseInt(editOrder.recurrenceEvery ?? 1, 10) || 0,
+      recurrenceDays: Array.isArray(editOrder.recurrenceDays) ? editOrder.recurrenceDays : [],
+      recurrenceUntil: editOrder.recurrenceUntil || '',
+      address: hydrated.address || '',
+      cleaningType: editOrder.cleaningType || mapCleaningType(hydrated.serviceType, hydrated.cleaningCategory),
+      checklistItems: (Array.isArray(editOrder.checklist) ? editOrder.checklist : []).filter(
+        (item) => typeof item === 'string' && item && !item.startsWith('equipment:') && item !== 'animalHair' && item !== 'smoking'
+      ),
+      comments: hydrated.comments || '',
+    });
   }, [isEditMode, editOrder, isAdmin]);
 
   // If not authenticated, show login prompt
@@ -782,14 +991,36 @@ const NewOrder = ({ navigation, route }) => {
               <View style={styles.adminEditorWrap}>
                 <Text style={styles.adminEditorTitle}>Admin: Edit Service Type Labels</Text>
                 {serviceTypeOptions.map((option) => (
-                  <TextInput
-                    key={`st-${option.value}`}
-                    style={styles.input}
-                    value={option.label}
-                    onChangeText={(val) => updateServiceTypeLabel(option.value, val)}
-                    placeholder="Service type label"
-                  />
+                  <View key={`st-${option.value}`} style={styles.adminEditableRow}>
+                    <TextInput
+                      style={[styles.input, styles.adminEditableInput]}
+                      value={option.label}
+                      onChangeText={(val) => updateServiceTypeLabel(option.value, val)}
+                      placeholder="Service type label"
+                    />
+                    {!REQUIRED_SERVICE_VALUES.includes(option.value) && (
+                      <TouchableOpacity style={styles.deleteBtn} onPress={() => removeServiceType(option.value)}>
+                        <Text style={styles.deleteBtnText}>Delete</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 ))}
+                <Text style={styles.adminEditorTitle}>Add New Service Type</Text>
+                <View style={styles.adminAddRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 0.4, marginBottom: 0 }]}
+                    value={newServiceValue}
+                    onChangeText={setNewServiceValue}
+                    placeholder="Value (e.g. office)"
+                  />
+                  <TextInput
+                    style={[styles.input, styles.adminAddInput]}
+                    value={newServiceLabel}
+                    onChangeText={setNewServiceLabel}
+                    placeholder="Label (shown to users)"
+                  />
+                  <Button title="Add" onPress={addServiceType} variant="secondary" />
+                </View>
               </View>
             )}
           </SectionCard>
@@ -814,12 +1045,19 @@ const NewOrder = ({ navigation, route }) => {
                     <Text style={styles.adminEditorTitle}>Admin: Edit Cleaning Category Content</Text>
                     {cleaningCategoryOptions.map((option) => (
                       <View key={`cc-${option.value}`} style={styles.adminEditorBlock}>
-                        <TextInput
-                          style={styles.input}
-                          value={option.label}
-                          onChangeText={(val) => updateCleaningCategoryField(option.value, 'label', val)}
-                          placeholder="Category label"
-                        />
+                        <View style={styles.adminEditableRow}>
+                          <TextInput
+                            style={[styles.input, styles.adminEditableInput]}
+                            value={option.label}
+                            onChangeText={(val) => updateCleaningCategoryField(option.value, 'label', val)}
+                            placeholder="Category label"
+                          />
+                          {!REQUIRED_CATEGORY_VALUES.includes(option.value) && (
+                            <TouchableOpacity style={styles.deleteBtn} onPress={() => removeCleaningCategory(option.value)}>
+                              <Text style={styles.deleteBtnText}>Delete</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
                         <TextInput
                           style={styles.input}
                           value={option.description || ''}
@@ -828,6 +1066,30 @@ const NewOrder = ({ navigation, route }) => {
                         />
                       </View>
                     ))}
+                    <Text style={styles.adminEditorTitle}>Add New Cleaning Category</Text>
+                    <View style={styles.adminAddRow}>
+                      <TextInput
+                        style={[styles.input, { flex: 0.4, marginBottom: 0 }]}
+                        value={newCategoryValue}
+                        onChangeText={setNewCategoryValue}
+                        placeholder="Value (e.g. deep)"
+                      />
+                      <TextInput
+                        style={[styles.input, styles.adminAddInput]}
+                        value={newCategoryLabel}
+                        onChangeText={setNewCategoryLabel}
+                        placeholder="Label"
+                      />
+                    </View>
+                    <View style={styles.adminAddRow}>
+                      <TextInput
+                        style={[styles.input, styles.adminAddInput]}
+                        value={newCategoryDesc}
+                        onChangeText={setNewCategoryDesc}
+                        placeholder="Description (optional)"
+                      />
+                      <Button title="Add" onPress={addCleaningCategory} variant="secondary" />
+                    </View>
                   </View>
                 )}
               </SectionCard>
@@ -1153,25 +1415,51 @@ const NewOrder = ({ navigation, route }) => {
             ) : null}
 
             <View style={styles.calendarToolbar}>
-              <View style={styles.calendarModes}>
-                {['month', 'week', 'day'].map((mode) => (
+              <View style={styles.calendarToolbarLeft}>
+                <View style={styles.calendarModes}>
+                  {['month', 'week', 'day'].map((mode) => (
+                    <TouchableOpacity
+                      key={mode}
+                      style={[styles.modeBtn, calendarMode === mode && styles.modeBtnActive]}
+                      onPress={() => setCalendarMode(mode)}
+                    >
+                      <Text style={[styles.modeBtnText, calendarMode === mode && styles.modeBtnTextActive]}>
+                        {mode}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.calendarNavRow}>
                   <TouchableOpacity
-                    key={mode}
-                    style={[styles.modeBtn, calendarMode === mode && styles.modeBtnActive]}
-                    onPress={() => setCalendarMode(mode)}
+                    style={styles.calendarNavBtn}
+                    onPress={() => setCalendarDate((prev) => shiftCalendarDate(prev, calendarMode, -1))}
                   >
-                    <Text style={[styles.modeBtnText, calendarMode === mode && styles.modeBtnTextActive]}>
-                      {mode}
-                    </Text>
+                    <Text style={styles.calendarNavBtnText}>{t('common.prev', 'Prev')}</Text>
                   </TouchableOpacity>
-                ))}
+                  <TouchableOpacity
+                    style={styles.calendarNavBtn}
+                    onPress={() => setCalendarDate(new Date())}
+                  >
+                    <Text style={styles.calendarNavBtnText}>{t('common.today', 'Today')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.calendarNavBtn}
+                    onPress={() => setCalendarDate((prev) => shiftCalendarDate(prev, calendarMode, 1))}
+                  >
+                    <Text style={styles.calendarNavBtnText}>{t('common.next', 'Next')}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <Button
-                title={hasBookingEvent || isEditMode ? t('scheduling.editEvent', 'Edit event') : t('scheduling.newEvent', 'New event')}
-                onPress={handleOpenEventModal}
-                variant="primary"
-              />
+              <View style={styles.calendarActionWrap}>
+                <Button
+                  title={hasBookingEvent || isEditMode ? t('scheduling.editEvent', 'Edit event') : t('scheduling.newEvent', 'New event')}
+                  onPress={handleOpenEventModal}
+                  variant="primary"
+                />
+              </View>
             </View>
+
+            <Text style={styles.calendarTitle}>{calendarTitle}</Text>
 
             {isEditMode ? (
               <View style={styles.editDateTimeWrap}>
@@ -1191,10 +1479,14 @@ const NewOrder = ({ navigation, route }) => {
                 <Text style={styles.calendarPlaceholder}>{t('common.loading', 'Loading...')}</Text>
               ) : (
                 <Calendar
+                  key={`calendar-${calendarMode}`}
                   events={calendarEvents}
                   mode={calendarMode}
+                  date={calendarDate}
                   height={isNarrowScreen ? 360 : 420}
                   weekStartsOn={1}
+                  swipeEnabled
+                  onSwipeEnd={(date) => setCalendarDate(date)}
                 />
               )}
             </View>
@@ -1439,12 +1731,26 @@ const NewOrder = ({ navigation, route }) => {
                   {eventForm.recurring ? (
                     <View style={styles.recurringWrap}>
                       <Text style={styles.inputLabel}>{t('scheduling.repeatEvery', 'Repeat every')}</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={String(eventForm.recurrenceEvery)}
-                        onChangeText={(value) => updateEventForm('recurrenceEvery', Math.max(1, parseInt(value || '1', 10)))}
-                        keyboardType="numeric"
-                      />
+                      <View style={styles.recurrenceStepperRow}>
+                        <View style={styles.recurrenceValueBox}>
+                          <Text style={styles.recurrenceValueText}>{String(eventForm.recurrenceEvery ?? 0)}</Text>
+                        </View>
+                        <View style={styles.recurrenceArrowColumn}>
+                          <TouchableOpacity
+                            style={styles.recurrenceArrowBtn}
+                            onPress={() => stepRecurrenceEvery(1)}
+                          >
+                            <Text style={styles.recurrenceArrowText}>▲</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.recurrenceArrowBtn}
+                            onPress={() => stepRecurrenceEvery(-1)}
+                          >
+                            <Text style={styles.recurrenceArrowText}>▼</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <Text style={styles.recurrenceUnitText}>{t('scheduling.week', 'week(s)')}</Text>
+                      </View>
                       <Text style={styles.inputLabel}>{t('scheduling.onDays', 'On days')}</Text>
                       <View style={styles.weekdayRow}>
                         {WEEKDAYS.map((day) => (
@@ -1510,19 +1816,6 @@ const NewOrder = ({ navigation, route }) => {
                     editable={false}
                   />
 
-                  <Text style={styles.inputLabel}>{t('client.cleaningType', 'Cleaning Type')}</Text>
-                  <View style={styles.clientPickerWrap}>
-                    <Picker
-                      selectedValue={eventForm.cleaningType}
-                      onValueChange={(value) => updateEventForm('cleaningType', value)}
-                    >
-                      <Picker.Item label={t('client.residential', 'Residential')} value="residential" />
-                      <Picker.Item label={t('client.commercial', 'Commercial')} value="commercial" />
-                      <Picker.Item label={t('client.deep', 'Deep Cleaning')} value="deep" />
-                      <Picker.Item label={t('client.move', 'Move-in/Move-out')} value="move" />
-                    </Picker>
-                  </View>
-
                   <Text style={styles.inputLabel}>{t('client.whatNeedsToBeDone', 'What needs to be done')}</Text>
                   <View style={styles.checklistInputRow}>
                     <TextInput
@@ -1576,6 +1869,9 @@ const NewOrder = ({ navigation, route }) => {
 
           {/* Submit */}
           <View style={styles.submitContainer}>
+            {bookingValidationError ? (
+              <Text style={styles.submitValidationText}>{bookingValidationError}</Text>
+            ) : null}
             <Button
               title={submitting
                 ? t('newOrder.submitting', 'Submitting...')
@@ -1810,17 +2106,60 @@ const styles = StyleSheet.create({
   calendarToolbar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexWrap: 'wrap',
     marginBottom: spacing.sm,
     gap: spacing.sm,
     width: '100%',
+  },
+  calendarToolbarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    flex: 1,
+    minWidth: 220,
+  },
+  calendarActionWrap: {
+    marginLeft: 'auto',
+    alignSelf: 'center',
+    alignItems: 'flex-end',
+  },
+  submitValidationText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.error,
+    marginBottom: spacing.xs,
   },
   calendarModes: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.xs,
     maxWidth: '100%',
+  },
+  calendarNavRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  calendarNavBtn: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.white,
+  },
+  calendarNavBtnText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textDark,
+    fontWeight: typography.fontWeight.medium,
+  },
+  calendarTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+    marginBottom: spacing.sm,
+    textTransform: 'capitalize',
   },
   modeBtn: {
     borderWidth: 1,
@@ -1984,6 +2323,60 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     marginBottom: spacing.sm,
     backgroundColor: colors.gray[50],
+  },
+  cleaningTypeOptionsWrap: {
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.white,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  recurrenceStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  recurrenceValueBox: {
+    minWidth: 72,
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.white,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recurrenceValueText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+  },
+  recurrenceArrowColumn: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.white,
+  },
+  recurrenceArrowBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 24,
+  },
+  recurrenceArrowText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textDark,
+    fontWeight: typography.fontWeight.bold,
+  },
+  recurrenceUnitText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textDark,
   },
   weekdayRow: {
     flexDirection: 'row',

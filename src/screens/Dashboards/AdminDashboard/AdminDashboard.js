@@ -582,6 +582,28 @@ const AdminDashboard = ({ route }) => {
                   </View>
                 </View>
 
+                {task.isRecurring ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>🔄 Recurring</Text>
+                    <Text style={styles.detailValue}>
+                      Every {task.recurrenceEvery ?? 1} week(s){task.recurrenceCount ? ` • ${task.recurrenceCount} tasks total` : ''}
+                    </Text>
+                    {(() => {
+                      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                      const days = Array.isArray(task.recurrenceDays)
+                        ? task.recurrenceDays
+                        : (typeof task.recurrenceDays === 'string' ? (() => { try { return JSON.parse(task.recurrenceDays); } catch { return []; } })() : []);
+                      if (days.length > 0) {
+                        return <Text style={styles.detailValue}>Days: {days.map(d => dayNames[d] || d).join(', ')}</Text>;
+                      }
+                      return null;
+                    })()}
+                    {task.recurrenceUntil ? (
+                      <Text style={styles.detailValue}>Until: {formatTaskDate(task.recurrenceUntil)}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
                 {task.comments ? (
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>💬 Comments</Text>
@@ -770,6 +792,13 @@ const AdminDashboard = ({ route }) => {
             </View>
           </View>
           <Text style={styles.taskAddress}>📍 {task.address}</Text>
+          {task.isRecurring ? (
+            <View style={styles.recurringBadge}>
+              <Text style={styles.recurringBadgeText}>
+                🔄 Recurring every {task.recurrenceEvery ?? 1} week(s){task.recurrenceCount ? ` (${task.recurrenceCount} tasks)` : ''}
+              </Text>
+            </View>
+          ) : null}
           <View style={styles.taskMetaRow}>
             <Text style={styles.taskDate}>📅 {formatTaskDate(task.date)}</Text>
             <Text style={styles.taskTime}>🕐 {task.time || '-'}</Text>
@@ -1280,6 +1309,8 @@ const styles = StyleSheet.create({
   tapHintText: { fontSize: typography.fontSize.xs, color: colors.primaryDark, fontWeight: typography.fontWeight.semibold },
   taskStatusBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: borderRadius.sm },
   taskStatusBadgeText: { fontSize: typography.fontSize.xs, fontWeight: typography.fontWeight.semibold },
+  recurringBadge: { alignSelf: 'flex-start', backgroundColor: '#EBF5FF', borderRadius: borderRadius.sm, paddingHorizontal: spacing.sm, paddingVertical: 3, marginBottom: spacing.xs },
+  recurringBadgeText: { fontSize: typography.fontSize.xs, color: colors.primary, fontWeight: typography.fontWeight.semibold },
   // ── Modal ──
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContainer: { backgroundColor: colors.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: Dimensions.get('window').height * 0.9, minHeight: 300 },

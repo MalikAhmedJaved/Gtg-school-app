@@ -21,6 +21,7 @@ import { colors, spacing, typography, borderRadius } from '../../../constants/th
 import DashboardSidebar from '../../../components/Layout/DashboardSidebar';
 import Profile from '../../../components/Dashboards/Profile';
 import api from '../../../utils/api';
+import { formatDate, formatTimeRange } from '../../../utils/formatters';
 
 const AdminDashboard = ({ route }) => {
   const insets = useSafeAreaInsets();
@@ -494,13 +495,7 @@ const AdminDashboard = ({ route }) => {
     );
   };
 
-  const formatTaskDate = (dateStr) => {
-    if (!dateStr) return '-';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-    } catch { return dateStr; }
-  };
+  const formatTaskDate = (dateStr) => formatDate(dateStr);
 
   const cleaningTypeLabels = { residential: 'Residential', commercial: 'Commercial', deep: 'Deep Cleaning', move: 'Move In/Out' };
   const frequencyLabels = { once: 'One-time', weekly: 'Weekly', biweekly: 'Bi-weekly', monthly: 'Monthly' };
@@ -556,7 +551,7 @@ const AdminDashboard = ({ route }) => {
                   </View>
                   <View style={styles.detailHalf}>
                     <Text style={styles.detailLabel}>🕐 Time</Text>
-                    <Text style={styles.detailValue}>{task.time || '-'}{task.endTime ? ` – ${task.endTime}` : ''}</Text>
+                    <Text style={styles.detailValue}>{formatTimeRange(task.time, task.endTime)}</Text>
                   </View>
                 </View>
 
@@ -801,7 +796,7 @@ const AdminDashboard = ({ route }) => {
           ) : null}
           <View style={styles.taskMetaRow}>
             <Text style={styles.taskDate}>📅 {formatTaskDate(task.date)}</Text>
-            <Text style={styles.taskTime}>🕐 {task.time || '-'}</Text>
+            <Text style={styles.taskTime}>🕐 {formatTimeRange(task.time, task.endTime)}</Text>
           </View>
           <Text style={styles.taskClient}>👤 {task.client?.name || '-'}</Text>
           <View style={styles.taskCardFooter}>
@@ -914,7 +909,7 @@ const AdminDashboard = ({ route }) => {
                   </View>
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>📅 Applied</Text>
-                    <Text style={styles.detailValue}>{seeker.createdAt ? new Date(seeker.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</Text>
+                    <Text style={styles.detailValue}>{formatDate(seeker.createdAt)}</Text>
                   </View>
                 </View>
 
@@ -1040,7 +1035,7 @@ const AdminDashboard = ({ route }) => {
           <Text style={styles.userPhone}>📞 {seeker.phone}</Text>
           {seeker.address ? <Text style={styles.userType}>📍 {seeker.address}{seeker.city ? `, ${seeker.city}` : ''}{seeker.zipCode ? ` ${seeker.zipCode}` : ''}</Text> : null}
           <Text style={styles.userType}>💼 Experience: {seeker.experience || 0} years</Text>
-          {seeker.createdAt ? <Text style={styles.smallText}>📅 Applied: {new Date(seeker.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</Text> : null}
+          {seeker.createdAt ? <Text style={styles.smallText}>📅 Applied: {formatDate(seeker.createdAt)}</Text> : null}
 
           {seeker.description ? (
             <Text style={styles.seekerDescription} numberOfLines={2}>{seeker.description}</Text>
@@ -1086,7 +1081,7 @@ const AdminDashboard = ({ route }) => {
             <Text style={styles.statusCompleted}>✅ Completed</Text>
           </View>
           <Text style={styles.taskAddress}>📍 {task.address}</Text>
-          <Text style={styles.taskDate}>📅 {task.date?.slice?.(0, 10) || task.date}</Text>
+          <Text style={styles.taskDate}>📅 {formatDate(task.date)}</Text>
           <Text style={styles.taskClient}>👤 Client: {task.client?.name || '-'}</Text>
           <Text style={styles.taskCleaner}>🧹 Cleaner: {task.cleaner?.name || '-'}</Text>
         </View>

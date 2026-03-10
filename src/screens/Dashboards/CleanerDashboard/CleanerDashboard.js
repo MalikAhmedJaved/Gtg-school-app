@@ -15,6 +15,49 @@ import DashboardSidebar from '../../../components/Layout/DashboardSidebar';
 import Profile from '../../../components/Dashboards/Profile';
 import Button from '../../../components/Common/Button';
 import api from '../../../utils/api';
+import { formatDate, formatTimeRange } from '../../../utils/formatters';
+
+const groupRecurringTasks = (items) => {
+  const groups = new Map();
+  const singles = [];
+
+  (Array.isArray(items) ? items : []).forEach((task) => {
+    const groupId = task.recurrenceGroupId;
+    if (!groupId) {
+      singles.push({ ...task, recurrenceCount: task.recurrenceCount || 1, isRecurring: Boolean(task.isRecurring) });
+      return;
+    }
+
+    const key = String(groupId);
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, { ...task, isRecurring: true, recurrenceCount: 1, _count: 1 });
+      return;
+    }
+
+    existing._count += 1;
+    existing.recurrenceCount = Math.max(existing.recurrenceCount || 1, existing._count, task.recurrenceCount || 1);
+
+    const existingDate = existing.date ? new Date(existing.date) : null;
+    const candidateDate = task.date ? new Date(task.date) : null;
+    if (candidateDate && (!existingDate || candidateDate < existingDate)) {
+      Object.assign(existing, {
+        ...task,
+        isRecurring: true,
+        recurrenceCount: existing.recurrenceCount,
+        _count: existing._count,
+      });
+    }
+  });
+
+  const grouped = Array.from(groups.values()).map((task) => {
+    const normalized = { ...task };
+    delete normalized._count;
+    return normalized;
+  });
+
+  return [...grouped, ...singles];
+};
 
 const CleanerDashboard = () => {
   const insets = useSafeAreaInsets();
@@ -57,8 +100,10 @@ const CleanerDashboard = () => {
         api.get('/tasks/completed'),
       ]);
 
-      setAvailableTasks(assignedRes.data?.success ? (assignedRes.data.data || []) : []);
-      setArchivedTasks(completedRes.data?.success ? (completedRes.data.data || []) : []);
+      const assignedData = assignedRes.data?.success ? (assignedRes.data.data || []) : [];
+      const onlyAssigned = assignedData.filter((task) => task.status === 'assigned');
+      setAvailableTasks(groupRecurringTasks(onlyAssigned));
+      setArchivedTasks(completedRes.data?.success ? groupRecurringTasks(completedRes.data.data || []) : []);
     } catch (error) {
       setErrorMessage(error.response?.data?.message || 'Failed to load tasks');
       setAvailableTasks([]);
@@ -101,9 +146,16 @@ const CleanerDashboard = () => {
         </Text>
       </View>
       <Text style={styles.taskAddress}>📍 {task.address || '-'}</Text>
-      <Text style={styles.taskDate}>📅 {(task.date || '').slice?.(0, 10) || task.date} {task.time ? `at ${task.time}` : ''}</Text>
+      <Text style={styles.taskDate}>📅 {formatDate(task.date)}  •  {formatTimeRange(task.time, task.endTime)}</Text>
       <Text style={styles.taskHours}>⏱️ {task.hours || '-'} hours</Text>
       <Text style={styles.taskClient}>👤 Client: {task.client?.name || '-'}</Text>
+      {task.isRecurring ? (
+        <View style={styles.recurringBadge}>
+          <Text style={styles.recurringText}>
+            🔁 Recurring every {task.recurrenceEvery ?? 1} week(s){task.recurrenceCount ? ` (${task.recurrenceCount} tasks)` : ''}
+          </Text>
+        </View>
+      ) : null}
       {task.rating ? <Text style={styles.taskRating}>⭐ Rating: {task.rating}/5</Text> : null}
 
       {!isArchive ? (
@@ -271,6 +323,21 @@ const styles = StyleSheet.create({
   taskHours: { fontSize: typography.fontSize.sm, color: colors.text, marginBottom: spacing.xs },
   taskClient: { fontSize: typography.fontSize.sm, color: colors.text, marginBottom: spacing.xs },
   taskRating: { fontSize: typography.fontSize.sm, color: colors.text, marginTop: spacing.xs, fontWeight: typography.fontWeight.semibold },
+  recurringBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f1ff',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.sm,
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+  },
+  recurringText: {
+    fontSize: typography.fontSize.sm,
+    color: '#0d6efd',
+    fontWeight: typography.fontWeight.semibold,
+  },
   buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   actionButton: { marginTop: spacing.xs },
   topActions: { alignItems: 'flex-end', marginBottom: spacing.md },

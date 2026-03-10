@@ -40,6 +40,7 @@ const Profile = ({ userRole }) => {
   const [userPhoto, setUserPhoto] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [isEditing, setIsEditing] = useState(true);
 
   // Fetch fresh profile data from the API on mount
   useEffect(() => {
@@ -175,6 +176,7 @@ const Profile = ({ userRole }) => {
         await updateUserData(updatedUser);
         Alert.alert('Success', 'Profile updated successfully!');
         setFormData({ ...formData, password: '', confirmPassword: '' });
+        setIsEditing(false);
       } else {
         Alert.alert('Error', response.data.message || 'Failed to update profile');
       }
@@ -220,7 +222,7 @@ const Profile = ({ userRole }) => {
 
       <View style={styles.summaryCard}>
         <View style={styles.photoSection}>
-          <TouchableOpacity onPress={handlePhotoPick} style={styles.photoPreview}>
+          <TouchableOpacity onPress={isEditing ? handlePhotoPick : undefined} disabled={!isEditing} style={styles.photoPreview}>
             {userPhoto ? (
               <Image source={{ uri: userPhoto }} style={styles.photo} />
             ) : (
@@ -230,54 +232,59 @@ const Profile = ({ userRole }) => {
               </View>
             )}
           </TouchableOpacity>
-          <View style={styles.photoActions}>
-            <Button
-              title={userPhoto ? t('profile.changePhoto', 'Change Photo') : t('profile.uploadPhoto', 'Upload Photo')}
-              onPress={handlePhotoPick}
-              variant="secondary"
-              style={styles.photoButton}
-            />
-            {userPhoto && (
+          {isEditing ? (
+            <View style={styles.photoActions}>
               <Button
-                title={t('profile.removePhoto', 'Remove Photo')}
-                onPress={handleRemovePhoto}
-                variant="danger"
+                title={userPhoto ? t('profile.changePhoto', 'Change Photo') : t('profile.uploadPhoto', 'Upload Photo')}
+                onPress={handlePhotoPick}
+                variant="secondary"
                 style={styles.photoButton}
               />
-            )}
-          </View>
+              {userPhoto && (
+                <Button
+                  title={t('profile.removePhoto', 'Remove Photo')}
+                  onPress={handleRemovePhoto}
+                  variant="danger"
+                  style={styles.photoButton}
+                />
+              )}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>{t('auth.fullName', 'Full Name')} *</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, !isEditing && styles.inputDisabled]}
             value={formData.name}
             onChangeText={(value) => handleChange('name', value)}
             placeholder="Enter your full name"
+            editable={isEditing}
           />
         </View>
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>{t('auth.email', 'Email')} *</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, !isEditing && styles.inputDisabled]}
             value={formData.email}
             onChangeText={(value) => handleChange('email', value)}
             placeholder="Enter your email"
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={isEditing}
           />
         </View>
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>{t('auth.phone', 'Phone')} *</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, !isEditing && styles.inputDisabled]}
             value={formData.phone}
             onChangeText={(value) => handleChange('phone', value)}
             placeholder="Enter your phone number"
             keyboardType="phone-pad"
+            editable={isEditing}
           />
         </View>
 
@@ -298,31 +305,34 @@ const Profile = ({ userRole }) => {
           <View style={styles.formGroup}>
             <Text style={styles.label}>{t('auth.address', 'Address')} *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, !isEditing && styles.inputDisabled]}
               value={formData.address}
               onChangeText={(value) => handleChange('address', value)}
               placeholder="Enter your address"
               multiline
+              editable={isEditing}
             />
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>{t('auth.city', 'City')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, !isEditing && styles.inputDisabled]}
               value={formData.city}
               onChangeText={(value) => handleChange('city', value)}
               placeholder="Enter your city"
+              editable={isEditing}
             />
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>{t('auth.zipCode', 'Zip Code')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, !isEditing && styles.inputDisabled]}
               value={formData.zipCode}
               onChangeText={(value) => handleChange('zipCode', value)}
               placeholder="Enter your zip code"
+              editable={isEditing}
             />
           </View>
         </View>
@@ -419,46 +429,52 @@ const Profile = ({ userRole }) => {
           </View>
         )}
 
-        {/* Password Change */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Change Password</Text>
-          <Text style={styles.hint}>
-            Leave blank if you don't want to change your password
-          </Text>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>{t('profile.newPassword', 'New Password')}</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.password}
-              onChangeText={(value) => handleChange('password', value)}
-              placeholder="Enter new password (min 6 characters)"
-              secureTextEntry
-            />
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>
-              {t('profile.confirmNewPassword', 'Confirm New Password')}
+        {/* Password Change — only when editing */}
+        {isEditing ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Change Password</Text>
+            <Text style={styles.hint}>
+              Leave blank if you don't want to change your password
             </Text>
-            <TextInput
-              style={styles.input}
-              value={formData.confirmPassword}
-              onChangeText={(value) => handleChange('confirmPassword', value)}
-              placeholder="Confirm new password"
-              secureTextEntry
-            />
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>{t('profile.newPassword', 'New Password')}</Text>
+              <TextInput
+                style={styles.input}
+                value={formData.password}
+                onChangeText={(value) => handleChange('password', value)}
+                placeholder="Enter new password (min 6 characters)"
+                secureTextEntry
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>
+                {t('profile.confirmNewPassword', 'Confirm New Password')}
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={formData.confirmPassword}
+                onChangeText={(value) => handleChange('confirmPassword', value)}
+                placeholder="Confirm new password"
+                secureTextEntry
+              />
+            </View>
           </View>
-        </View>
+        ) : null}
 
         <View style={styles.actions}>
-          <Button
-            title="Save Changes"
-            onPress={handleSubmit}
-            variant="primary"
-            loading={loading}
-            style={styles.saveButton}
-          />
+          {isEditing ? (
+            <Button
+              title="Save Changes"
+              onPress={handleSubmit}
+              variant="primary"
+              loading={loading}
+              style={styles.saveButton}
+            />
+          ) : (
+            <Text style={styles.savedHint}>{t('profile.changesSaved', 'Profile saved. Log out and log in again to make further changes.')}</Text>
+          )}
           <Button
             title={t('auth.logout', 'Logout')}
             onPress={handleLogout}
@@ -669,6 +685,17 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     fontSize: typography.fontSize.xs,
     color: colors.textLight,
+  },
+  inputDisabled: {
+    backgroundColor: colors.backgroundLight,
+    color: colors.textLight,
+  },
+  savedHint: {
+    fontSize: typography.fontSize.sm,
+    color: colors.success,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    fontWeight: typography.fontWeight.semibold,
   },
 });
 

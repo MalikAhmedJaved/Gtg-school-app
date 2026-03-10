@@ -5,7 +5,12 @@ const ORDERS_STORAGE_KEY = '@cleaning_orders';
 
 // Calculate hours based on order selections
 export const calculateHours = (orderData) => {
-  const { cleaningCategory, adhocSelections = [], homeSize, extraBathrooms = 0 } = orderData;
+  const { serviceType, cleaningCategory, adhocSelections = [], homeSize, extraBathrooms = 0 } = orderData;
+
+  // Non-home services (commercial, move-in/out): use manual hours
+  if (serviceType && serviceType !== 'home') {
+    return orderData.manualHours || 3;
+  }
 
   if (cleaningCategory === 'standard') {
     return 3;
@@ -33,7 +38,7 @@ export const calculateHours = (orderData) => {
     return hours;
   }
 
-  // Commercial or move-in/out: use manual hours or default
+  // Fallback: use manual hours or default
   return orderData.manualHours || 3;
 };
 

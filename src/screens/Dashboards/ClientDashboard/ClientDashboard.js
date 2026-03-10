@@ -15,6 +15,7 @@ import Profile from '../../../components/Dashboards/Profile';
 import Button from '../../../components/Common/Button';
 import { navigate as rootNavigate } from '../../../utils/rootNavigation';
 import { getOrders } from '../../../utils/orderService';
+import { formatDate, formatTimeRange } from '../../../utils/formatters';
 
 const ClientDashboard = () => {
   const insets = useSafeAreaInsets();
@@ -97,7 +98,7 @@ const ClientDashboard = () => {
         <Text style={styles.taskStatus}>{statusLabel}</Text>
       </View>
       <Text style={styles.taskAddress}>📍 {task.address || '-'}</Text>
-      <Text style={styles.taskDate}>📅 {(task.date || '').slice?.(0, 10) || task.date} {task.time ? `at ${task.time}` : ''}</Text>
+      <Text style={styles.taskDate}>📅 {formatDate(task.date)}  •  {formatTimeRange(task.time, task.endTime)}</Text>
       <Text style={styles.taskHours}>⏱️ {task.hours || task.calculatedHours || '-'} hours</Text>
       {task.cleaner?.name ? <Text style={styles.taskCleaner}>🧹 Cleaner: {task.cleaner.name}</Text> : null}
       {task.rating ? <Text style={styles.taskRating}>⭐ Rating: {task.rating}/5</Text> : null}

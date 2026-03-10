@@ -151,6 +151,7 @@ const NewOrder = ({ navigation, route }) => {
   const [eventError, setEventError] = useState('');
   const [bookingValidationError, setBookingValidationError] = useState('');
   const [hasBookingEvent, setHasBookingEvent] = useState(false);
+  const [dateEventsModal, setDateEventsModal] = useState(null); // { date, events[] }
   const [showNativeDatePicker, setShowNativeDatePicker] = useState(false);
   const [showNativeStartTimePicker, setShowNativeStartTimePicker] = useState(false);
   const [showNativeEndTimePicker, setShowNativeEndTimePicker] = useState(false);
@@ -455,7 +456,6 @@ const NewOrder = ({ navigation, route }) => {
       return;
     }
 
-    const service = mapServiceFromCleaningType(eventForm.cleaningType);
     const normalizedEvent = {
       title: eventForm.title.trim(),
       date: eventForm.date,
@@ -467,15 +467,13 @@ const NewOrder = ({ navigation, route }) => {
       recurrenceDays: Array.isArray(eventForm.recurrenceDays) ? eventForm.recurrenceDays : [],
       recurrenceUntil: eventForm.recurrenceUntil || '',
       address: eventForm.address.trim(),
-      cleaningType: eventForm.cleaningType,
+      cleaningType: mapCleaningType(order.serviceType, order.cleaningCategory),
       checklistItems: Array.isArray(eventForm.checklistItems) ? eventForm.checklistItems.filter(Boolean) : [],
       comments: eventForm.comments.trim(),
     };
 
     setOrder((prev) => ({
       ...prev,
-      serviceType: service.serviceType,
-      cleaningCategory: service.cleaningCategory,
       address: normalizedEvent.address,
       date: normalizedEvent.date,
       time: normalizedEvent.allDay ? '09:00' : normalizedEvent.startTime,
@@ -520,22 +518,49 @@ const NewOrder = ({ navigation, route }) => {
     setChecklistInput('');
   };
 
-  const handleOpenEventModal = () => {
+  const handleOpenEventModal = (prefilledDate) => {
     setEventError('');
     setBookingValidationError('');
     const source = savedEventData || eventForm;
+    const dateStr = prefilledDate
+      ? prefilledDate.toISOString().slice(0, 10)
+      : (order.date || source.date || new Date().toISOString().slice(0, 10));
     setEventForm((prev) => ({
       ...prev,
       ...source,
       title: source.title || order.address || '',
-      date: order.date || source.date || new Date().toISOString().slice(0, 10),
+      date: dateStr,
       startTime: order.time || source.startTime || '09:00',
       endTime: source.endTime || order.time || source.startTime || '09:30',
       address: order.address || source.address,
-      cleaningType: source.cleaningType || mapCleaningType(order.serviceType, order.cleaningCategory),
+      cleaningType: mapCleaningType(order.serviceType, order.cleaningCategory),
       comments: order.comments || source.comments,
     }));
     setShowNewEvent(true);
+  };
+
+  const handleCalendarPressCell = (date) => {
+    const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const dayEvents = calendarEvents.filter(
+      (evt) => evt.start >= dayStart && evt.start < dayEnd
+    );
+    if (dayEvents.length > 0) {
+      setDateEventsModal({ date: dayStart, events: dayEvents });
+    } else {
+      handleOpenEventModal(date);
+    }
+  };
+
+  const handleCalendarPressEvent = (event) => {
+    const dayStart = new Date(event.start.getFullYear(), event.start.getMonth(), event.start.getDate());
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+    const dayEvents = calendarEvents.filter(
+      (evt) => evt.start >= dayStart && evt.start < dayEnd
+    );
+    setDateEventsModal({ date: dayStart, events: dayEvents });
   };
 
   const handleSubmit = async () => {
@@ -1453,7 +1478,7 @@ const NewOrder = ({ navigation, route }) => {
               <View style={styles.calendarActionWrap}>
                 <Button
                   title={hasBookingEvent || isEditMode ? t('scheduling.editEvent', 'Edit event') : t('scheduling.newEvent', 'New event')}
-                  onPress={handleOpenEventModal}
+                  onPress={() => handleOpenEventModal()}
                   variant="primary"
                 />
               </View>
@@ -1468,7 +1493,7 @@ const NewOrder = ({ navigation, route }) => {
                 </Text>
                 <Button
                   title={t('orders.editDateTime', 'Edit Date & Time')}
-                  onPress={handleOpenEventModal}
+                  onPress={() => handleOpenEventModal()}
                   variant="secondary"
                 />
               </View>
@@ -1487,6 +1512,8 @@ const NewOrder = ({ navigation, route }) => {
                   weekStartsOn={1}
                   swipeEnabled
                   onSwipeEnd={(date) => setCalendarDate(date)}
+                  onPressCell={handleCalendarPressCell}
+                  onPressEvent={handleCalendarPressEvent}
                 />
               )}
             </View>
@@ -1862,6 +1889,39 @@ const NewOrder = ({ navigation, route }) => {
                     <Button title={t('scheduling.saveEvent', 'Save')} onPress={handleSaveNewEvent} variant="primary" />
                     <Button title={t('common.cancel', 'Cancel')} onPress={() => setShowNewEvent(false)} variant="secondary" />
                   </View>
+                </ScrollView>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Date Events Modal */}
+          <Modal
+            visible={!!dateEventsModal}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setDateEventsModal(null)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalCard, { width: modalWidth }]}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>
+                    {dateEventsModal
+                      ? `${dateEventsModal.date.toLocaleDateString('en-GB')} — ${dateEventsModal.events.length} ${dateEventsModal.events.length === 1 ? t('scheduling.event', 'Event') : t('scheduling.events', 'Events')}`
+                      : ''}
+                  </Text>
+                  <TouchableOpacity onPress={() => setDateEventsModal(null)}>
+                    <Text style={styles.modalClose}>×</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={styles.modalBody}>
+                  {dateEventsModal?.events.map((evt, idx) => (
+                    <View key={evt.id || idx} style={styles.dateEventCard}>
+                      <Text style={styles.dateEventTitle}>{evt.title}</Text>
+                      <Text style={styles.dateEventDetail}>
+                        {t('scheduling.time', 'Time')}: {evt.start ? evt.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''} - {evt.end ? evt.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </Text>
+                    </View>
+                  ))}
                 </ScrollView>
               </View>
             </View>
@@ -2278,6 +2338,24 @@ const styles = StyleSheet.create({
   modalBody: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  dateEventCard: {
+    backgroundColor: colors.gray[50] || '#f9fafb',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+  },
+  dateEventTitle: {
+    fontSize: typography.fontSize.base,
+    fontWeight: typography.fontWeight.semiBold,
+    color: colors.textDark,
+    marginBottom: 4,
+  },
+  dateEventDetail: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
   },
   timeRow: {
     flexDirection: 'row',

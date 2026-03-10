@@ -14,6 +14,7 @@ import { colors, spacing, typography, borderRadius, shadows } from '../../consta
 import { SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES, getOrderById } from '../../utils/orderService';
 import SectionCard from '../../components/Common/SectionCard';
 import Button from '../../components/Common/Button';
+import { formatDate, formatTimeRange } from '../../utils/formatters';
 import { navigate as rootNavigate } from '../../utils/rootNavigation';
 import api from '../../utils/api';
 
@@ -224,14 +225,14 @@ const OrderDetail = ({ route, navigation }) => {
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-              <Text style={styles.detailValue}>{order.date || '—'}</Text>
+              <Text style={styles.detailValue}>{formatDate(order.date)}</Text>
             </View>
             <View style={styles.detailRow}>
               <Ionicons name="time-outline" size={18} color={colors.primary} />
               <Text style={styles.detailValue}>
                 {order.allDay
                   ? t('orders.allDay', 'All Day')
-                  : `${order.time || '—'}${order.endTime ? ` – ${order.endTime}` : ''}`}
+                  : formatTimeRange(order.time, order.endTime)}
               </Text>
             </View>
             <View style={styles.detailRow}>
@@ -263,7 +264,7 @@ const OrderDetail = ({ route, navigation }) => {
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('orders.orderDate', 'Order Date')}</Text>
             <Text style={styles.metaValue}>
-              {new Date(order.createdAt).toLocaleDateString()}
+              {formatDate(order.createdAt)}
             </Text>
           </View>
         )}

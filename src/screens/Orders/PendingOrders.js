@@ -13,6 +13,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { getOrders, SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES } from '../../utils/orderService';
+import { formatDate, formatTimeRange } from '../../utils/formatters';
 
 const PendingOrders = ({ navigation }) => {
   const { t } = useLanguage();
@@ -86,7 +87,7 @@ const PendingOrders = ({ navigation }) => {
     try {
       const data = await getOrders({ status: isCleaner ? 'assigned' : 'pending' });
       const filteredData = isCleaner
-        ? (Array.isArray(data) ? data.filter((task) => task.status === 'assigned') : [])
+        ? groupRecurringClientOrders(Array.isArray(data) ? data.filter((task) => task.status === 'assigned') : [])
         : groupRecurringClientOrders(data);
       setOrders(filteredData);
     } catch (error) {
@@ -145,7 +146,7 @@ const PendingOrders = ({ navigation }) => {
         </View>
         <View style={styles.detailRow}>
           <Ionicons name="calendar-outline" size={15} color={colors.textLight} />
-          <Text style={styles.detailText}>{item.date || '—'}{item.time ? `  •  ${item.time}` : ''}</Text>
+          <Text style={styles.detailText}>{formatDate(item.date)}  •  {formatTimeRange(item.time, item.endTime)}</Text>
         </View>
         {(item.calculatedHours || item.hours) ? (
           <View style={styles.detailRow}>

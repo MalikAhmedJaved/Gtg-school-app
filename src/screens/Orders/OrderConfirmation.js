@@ -12,6 +12,7 @@ import { colors, spacing, typography, borderRadius } from '../../constants/theme
 import { SERVICE_TYPES, CLEANING_CATEGORIES } from '../../utils/orderService';
 import { navigate as rootNavigate } from '../../utils/rootNavigation';
 import Button from '../../components/Common/Button';
+import { formatDate } from '../../utils/formatters';
 
 const OrderConfirmation = ({ route }) => {
   const { t } = useLanguage();
@@ -59,7 +60,7 @@ const OrderConfirmation = ({ route }) => {
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{t('newOrder.preferredDate', 'Date')}</Text>
-              <Text style={styles.summaryValue}>{order.date}</Text>
+              <Text style={styles.summaryValue}>{formatDate(order.date)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{t('orders.estimatedHours', 'Estimated Hours')}</Text>

@@ -13,8 +13,51 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { getOrders, SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES } from '../../utils/orderService';
+import { formatDate, formatTimeRange } from '../../utils/formatters';
 import { navigate as rootNavigate } from '../../utils/rootNavigation';
 import Button from '../../components/Common/Button';
+
+const groupRecurringOrders = (items) => {
+  const groups = new Map();
+  const singles = [];
+
+  (Array.isArray(items) ? items : []).forEach((task) => {
+    const groupId = task.recurrenceGroupId;
+    if (!groupId) {
+      singles.push({ ...task, recurrenceCount: task.recurrenceCount || 1, isRecurring: Boolean(task.isRecurring) });
+      return;
+    }
+
+    const key = String(groupId);
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, { ...task, isRecurring: true, recurrenceCount: 1, _count: 1 });
+      return;
+    }
+
+    existing._count += 1;
+    existing.recurrenceCount = Math.max(existing.recurrenceCount || 1, existing._count, task.recurrenceCount || 1);
+
+    const existingDate = existing.date ? new Date(existing.date) : null;
+    const candidateDate = task.date ? new Date(task.date) : null;
+    if (candidateDate && (!existingDate || candidateDate < existingDate)) {
+      Object.assign(existing, {
+        ...task,
+        isRecurring: true,
+        recurrenceCount: existing.recurrenceCount,
+        _count: existing._count,
+      });
+    }
+  });
+
+  const grouped = Array.from(groups.values()).map((task) => {
+    const normalized = { ...task };
+    delete normalized._count;
+    return normalized;
+  });
+
+  return [...grouped, ...singles];
+};
 
 const ConfirmedOrders = ({ navigation }) => {
   const { t } = useLanguage();
@@ -29,9 +72,10 @@ const ConfirmedOrders = ({ navigation }) => {
       const visibleOrders = userRole === 'cleaner'
         ? data.filter((order) => order.status !== 'assigned')
         : data;
+      const grouped = groupRecurringOrders(visibleOrders);
       const priority = { confirmed: 0, accepted: 1, assigned: 2, pending: 3, completed: 4, cancelled: 5, archived: 6 };
-      visibleOrders.sort((a, b) => (priority[a.status] ?? 99) - (priority[b.status] ?? 99));
-      setOrders(visibleOrders);
+      grouped.sort((a, b) => (priority[a.status] ?? 99) - (priority[b.status] ?? 99));
+      setOrders(grouped);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -108,6 +152,16 @@ const ConfirmedOrders = ({ navigation }) => {
           <Text style={styles.categoryLabel}>{categoryLabel}</Text>
         ) : null}
 
+        {item.isRecurring ? (
+          <View style={styles.recurringBadge}>
+            <Ionicons name="repeat" size={13} color={colors.primaryDark} />
+            <Text style={styles.recurringText}>
+              {`Recurring every ${item.recurrenceEvery ?? 1} week(s)`}
+              {item.recurrenceCount ? ` (${item.recurrenceCount} tasks)` : ''}
+            </Text>
+          </View>
+        ) : null}
+
         <View style={styles.cardDetails}>
           {item.address ? (
             <View style={styles.detailRow}>
@@ -118,7 +172,7 @@ const ConfirmedOrders = ({ navigation }) => {
           <View style={styles.detailRow}>
             <Ionicons name="calendar-outline" size={16} color={colors.textLight} />
             <Text style={styles.detailText}>
-              {item.date || 'No date'} {item.time ? `at ${item.time}` : ''}
+              {formatDate(item.date)}  •  {formatTimeRange(item.time, item.endTime)}
             </Text>
           </View>
           <View style={styles.detailRow}>
@@ -225,6 +279,23 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.medium,
     marginBottom: spacing.sm,
     marginLeft: 28,
+  },
+  recurringBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primaryDark + '10',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: borderRadius.md,
+    alignSelf: 'flex-start',
+    marginBottom: spacing.xs,
+    marginLeft: 28,
+  },
+  recurringText: {
+    fontSize: typography.fontSize.xs,
+    color: colors.primaryDark,
+    marginLeft: 4,
+    fontWeight: typography.fontWeight.medium,
   },
   cardDetails: {
     marginTop: spacing.xs,

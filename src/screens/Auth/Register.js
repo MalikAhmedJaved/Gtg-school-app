@@ -19,8 +19,8 @@ const Register = () => {
     address: '',
     city: '',
     zipCode: '',
-    role: 'client',
-    clientType: 'private',
+    role: '',
+    clientType: '',
     companyName: '',
     vatNumber: '',
   });
@@ -28,12 +28,33 @@ const Register = () => {
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+
+      // Keep dependent fields consistent with the current role and client type.
+      if (field === 'role' && value !== 'client') {
+        next.clientType = '';
+        next.companyName = '';
+        next.vatNumber = '';
+      }
+
+      if (field === 'clientType' && value !== 'company') {
+        next.companyName = '';
+        next.vatNumber = '';
+      }
+
+      return next;
+    });
   };
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.email || !formData.password || !formData.phone || !formData.address) {
+    if (!formData.name || !formData.email || !formData.password || !formData.phone || !formData.address || !formData.role) {
       Alert.alert('Error', t('admin.fillAllFields', 'Please fill in all required fields.'));
+      return;
+    }
+
+    if (formData.role === 'client' && !formData.clientType) {
+      Alert.alert('Error', t('auth.selectClientType', 'Please select a client type.'));
       return;
     }
 
@@ -220,8 +241,11 @@ const Register = () => {
                   selectedValue={formData.role}
                   onValueChange={(value) => handleChange('role', value)}
                   style={styles.picker}
+                  dropdownIconColor={colors.textDark}
+                  prompt={t('auth.registerAs', 'Register as')}
                   mode="dropdown"
                 >
+                  <Picker.Item label={t('auth.selectRole', 'Select role')} value="" />
                   <Picker.Item label={t('auth.client', 'Client')} value="client" />
                   <Picker.Item label={t('auth.cleaner', 'Cleaner')} value="cleaner" />
                 </Picker>
@@ -237,8 +261,11 @@ const Register = () => {
                       selectedValue={formData.clientType}
                       onValueChange={(value) => handleChange('clientType', value)}
                       style={styles.picker}
+                      dropdownIconColor={colors.textDark}
+                      prompt={t('auth.clientType', 'Client Type')}
                       mode="dropdown"
                     >
+                      <Picker.Item label={t('auth.selectClientType', 'Select client type')} value="" />
                       <Picker.Item label={t('auth.private', 'Private')} value="private" />
                       <Picker.Item label={t('auth.company', 'Company')} value="company" />
                     </Picker>
@@ -364,6 +391,8 @@ const styles = StyleSheet.create({
   },
   picker: {
     height: 50,
+    color: colors.textDark,
+    backgroundColor: colors.white,
   },
   submitButton: {
     marginTop: spacing.md,

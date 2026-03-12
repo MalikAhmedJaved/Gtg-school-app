@@ -33,13 +33,6 @@ const MenuScreen = ({ navigation }) => {
       params: { initialTab: 'users' },
     },
     {
-      key: 'tasks',
-      label: t('admin.taskManagement', 'Task Management'),
-      icon: 'clipboard-outline',
-      screen: 'AdminDashboard',
-      params: { initialTab: 'tasks' },
-    },
-    {
       key: 'jobseekers',
       label: t('admin.jobSeekers', 'Job Seekers'),
       icon: 'document-text-outline',
@@ -56,6 +49,15 @@ const MenuScreen = ({ navigation }) => {
   ];
 
   // Primary menu items — the main sections for non-admin
+  const cleanerAttentionItem = userRole === 'cleaner'
+    ? [{
+        key: 'attention',
+        label: t('cleaner.attention', 'Attention'),
+        icon: 'alert-circle-outline',
+        screen: 'CleanerAttention',
+      }]
+    : [];
+
   const primaryItems = isAdmin ? adminItems : [
     {
       key: 'pending',
@@ -63,6 +65,7 @@ const MenuScreen = ({ navigation }) => {
       icon: 'time-outline',
       screen: 'PendingOrders',
     },
+    ...cleanerAttentionItem,
     {
       key: 'contact',
       label: t('nav.contact', 'Contact'),

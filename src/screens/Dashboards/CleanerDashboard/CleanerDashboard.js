@@ -15,6 +15,7 @@ import DashboardSidebar from '../../../components/Layout/DashboardSidebar';
 import Profile from '../../../components/Dashboards/Profile';
 import Button from '../../../components/Common/Button';
 import api from '../../../utils/api';
+import { sortOrdersBySchedule } from '../../../utils/orderService';
 import { formatDate, formatTimeRange } from '../../../utils/formatters';
 
 const groupRecurringTasks = (items) => {
@@ -56,7 +57,7 @@ const groupRecurringTasks = (items) => {
     return normalized;
   });
 
-  return [...grouped, ...singles];
+  return sortOrdersBySchedule([...grouped, ...singles], 'desc');
 };
 
 const CleanerDashboard = () => {

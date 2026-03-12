@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
-import { getOrders, SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES } from '../../utils/orderService';
+import { getOrders, sortOrdersBySchedule, SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES } from '../../utils/orderService';
 import { formatDate, formatTimeRange } from '../../utils/formatters';
 
 const PendingOrders = ({ navigation }) => {
@@ -22,15 +22,6 @@ const PendingOrders = ({ navigation }) => {
   const [orders, setOrders] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  const cleanerChecklist = [
-    t('cleanerChecklist.arriveOnTime', 'Arrive on time and confirm access details before starting.'),
-    t('cleanerChecklist.bringEquipment', 'Bring required equipment and verify any special products needed.'),
-    t('cleanerChecklist.handleFragile', 'Handle fragile items carefully and report any issue immediately.'),
-    t('cleanerChecklist.followChecklist', 'Follow the task checklist and complete all required areas.'),
-    t('cleanerChecklist.beforeAfter', 'Take before/after photos when required by admin or task notes.'),
-    t('cleanerChecklist.finalCheck', 'Do a final quality check before leaving the location.'),
-  ];
 
   const groupRecurringClientOrders = (items) => {
     const groups = new Map();
@@ -76,11 +67,7 @@ const PendingOrders = ({ navigation }) => {
       return normalized;
     });
 
-    return [...grouped, ...singles].sort((a, b) => {
-      const ad = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bd = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bd - ad;
-    });
+    return sortOrdersBySchedule([...grouped, ...singles], 'desc');
   };
 
   const fetchOrders = useCallback(async () => {
@@ -112,6 +99,14 @@ const PendingOrders = ({ navigation }) => {
     setRefreshing(false);
   };
 
+  const formatClientLocation = (client) => {
+    if (!client) return '';
+    const parts = [];
+    if (client.city) parts.push(client.city);
+    if (client.zipCode) parts.push(client.zipCode);
+    return parts.join(' • ');
+  };
+
   const renderOrderCard = ({ item }) => {
     const statusInfo = ORDER_STATUSES[item.status] || ORDER_STATUSES.pending;
     return (
@@ -128,9 +123,6 @@ const PendingOrders = ({ navigation }) => {
             <Text style={[styles.statusText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
           </View>
         </View>
-        {item.cleaningCategory && (
-          <Text style={styles.category}>{CLEANING_CATEGORIES[item.cleaningCategory]}</Text>
-        )}
         {item.isRecurring ? (
           <View style={styles.recurringBadge}>
             <Ionicons name="repeat" size={13} color={colors.primaryDark} />
@@ -157,7 +149,10 @@ const PendingOrders = ({ navigation }) => {
         {isCleaner && item.client?.name ? (
           <View style={styles.detailRow}>
             <Ionicons name="person-outline" size={15} color={colors.textLight} />
-            <Text style={styles.detailText}>{t('cleaner.client', 'Client')}: {item.client.name}</Text>
+            <Text style={styles.detailText}>
+              {t('cleaner.client', 'Client')}: {item.client.name}
+              {formatClientLocation(item.client) ? ` • ${formatClientLocation(item.client)}` : ''}
+            </Text>
           </View>
         ) : null}
       </TouchableOpacity>
@@ -166,18 +161,6 @@ const PendingOrders = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {isCleaner ? (
-        <View style={styles.checklistCard}>
-          <Text style={styles.checklistTitle}>{t('cleanerChecklist.title', 'Cleaner Checklist')}</Text>
-          {cleanerChecklist.map((point, index) => (
-            <View key={`check-${index}`} style={styles.checklistRow}>
-              <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-              <Text style={styles.checklistText}>{point}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-
       {orders.length === 0 && !loading ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="time-outline" size={64} color={colors.gray[300]} />
@@ -201,35 +184,6 @@ const PendingOrders = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.gray[50] },
-  checklistCard: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    borderWidth: 1,
-    borderColor: colors.gray[200],
-    padding: spacing.md,
-    ...shadows.sm,
-  },
-  checklistTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primaryDark,
-    marginBottom: spacing.sm,
-  },
-  checklistRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: spacing.xs,
-  },
-  checklistText: {
-    flex: 1,
-    marginLeft: spacing.xs,
-    fontSize: typography.fontSize.sm,
-    color: colors.text,
-    lineHeight: 20,
-  },
   listContent: { padding: spacing.md, paddingBottom: spacing.xxl },
   card: {
     backgroundColor: colors.white,

@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
-import { getOrders, SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES } from '../../utils/orderService';
+import { getOrders, sortOrdersBySchedule, SERVICE_TYPES, ORDER_STATUSES } from '../../utils/orderService';
 import { formatDate, formatTimeRange } from '../../utils/formatters';
 import { navigate as rootNavigate } from '../../utils/rootNavigation';
 import Button from '../../components/Common/Button';
@@ -70,12 +70,12 @@ const ConfirmedOrders = ({ navigation }) => {
     try {
       const data = await getOrders();
       const visibleOrders = userRole === 'cleaner'
-        ? data.filter((order) => order.status !== 'assigned')
-        : data;
-      const grouped = groupRecurringOrders(visibleOrders);
-      const priority = { confirmed: 0, accepted: 1, assigned: 2, pending: 3, completed: 4, cancelled: 5, archived: 6 };
-      grouped.sort((a, b) => (priority[a.status] ?? 99) - (priority[b.status] ?? 99));
-      setOrders(grouped);
+        ? data.filter((order) => !['assigned', 'completed', 'cancelled', 'archived'].includes(order.status))
+        : data.filter((order) => !['completed', 'cancelled', 'archived'].includes(order.status));
+      const nextOrders = userRole === 'cleaner'
+        ? sortOrdersBySchedule(visibleOrders, 'desc')
+        : sortOrdersBySchedule(groupRecurringOrders(visibleOrders), 'desc');
+      setOrders(nextOrders);
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -105,6 +105,14 @@ const ConfirmedOrders = ({ navigation }) => {
     setRefreshing(false);
   };
 
+  const formatClientLocation = (client) => {
+    if (!client) return '';
+    const parts = [];
+    if (client.city) parts.push(client.city);
+    if (client.zipCode) parts.push(client.zipCode);
+    return parts.join(' • ');
+  };
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
@@ -126,9 +134,6 @@ const ConfirmedOrders = ({ navigation }) => {
   const renderOrderCard = ({ item }) => {
     const statusInfo = ORDER_STATUSES[item.status] || ORDER_STATUSES.pending;
     const serviceLabel = SERVICE_TYPES[item.serviceType] || item.serviceType;
-    const categoryLabel = item.cleaningCategory
-      ? CLEANING_CATEGORIES[item.cleaningCategory] || item.cleaningCategory
-      : '';
 
     return (
       <TouchableOpacity
@@ -147,10 +152,6 @@ const ConfirmedOrders = ({ navigation }) => {
             </Text>
           </View>
         </View>
-
-        {categoryLabel ? (
-          <Text style={styles.categoryLabel}>{categoryLabel}</Text>
-        ) : null}
 
         {item.isRecurring ? (
           <View style={styles.recurringBadge}>
@@ -181,6 +182,15 @@ const ConfirmedOrders = ({ navigation }) => {
               {item.calculatedHours || item.manualHours || '–'} {t('admin.hours', 'hours')}
             </Text>
           </View>
+          {userRole === 'cleaner' && item.client?.name ? (
+            <View style={styles.detailRow}>
+              <Ionicons name="person-outline" size={16} color={colors.textLight} />
+              <Text style={styles.detailText}>
+                {t('cleaner.client', 'Client')}: {item.client.name}
+                {formatClientLocation(item.client) ? ` • ${formatClientLocation(item.client)}` : ''}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </TouchableOpacity>
     );

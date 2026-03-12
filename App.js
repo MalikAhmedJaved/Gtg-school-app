@@ -82,6 +82,7 @@ import ConfirmedOrders from './src/screens/Orders/ConfirmedOrders';
 import OrderDetail from './src/screens/Orders/OrderDetail.js';
 import PendingOrders from './src/screens/Orders/PendingOrders';
 import ArchiveOrders from './src/screens/Orders/ArchiveOrders';
+import CleanerAttention from './src/screens/Orders/CleanerAttention';
 
 // Profile Screen
 import ProfileScreen from './src/screens/Profile/ProfileScreen';
@@ -183,6 +184,7 @@ function MenuStack() {
       <Stack.Screen name="About" component={About} options={{ title: 'About Us' }} />
       <Stack.Screen name="Contact" component={Contact} options={{ title: 'Contact Us' }} />
       <Stack.Screen name="PendingOrders" component={PendingOrders} options={{ title: 'Pending' }} />
+      <Stack.Screen name="CleanerAttention" component={CleanerAttention} options={{ title: 'Attention' }} />
       <Stack.Screen name="ArchiveOrders" component={ArchiveOrders} options={{ title: 'Archive' }} />
       <Stack.Screen name="OrderDetail" component={OrderDetail} options={{ title: 'Order Details' }} />
       <Stack.Screen name="Login" component={Login} options={{ title: 'Login' }} />

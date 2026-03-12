@@ -104,7 +104,13 @@ function ChatThread({ partner, currentUserId, onBack, onMessageSent }) {
     try {
       const response = await api.get(`/chat/messages/${partner.id}`);
       if (response.data?.success) {
-        setMessages(response.data.data);
+        // Sort messages: oldest first (ascending)
+        const sorted = response.data.data.sort((a, b) => {
+          const dateA = new Date(a.createdAt || 0);
+          const dateB = new Date(b.createdAt || 0);
+          return dateA - dateB; // Ascending (oldest first)
+        });
+        setMessages(sorted);
       }
     } catch (error) {
       console.error('Load messages error:', error);
@@ -366,7 +372,7 @@ function UserPickerModal({ visible, onClose, onSelect }) {
 }
 
 // ─── MAIN CHAT SCREEN ────────────────────────────────────────
-export default function ChatScreen() {
+export default function ChatScreen({ route }) {
   const { isAuthenticated, userRole, userId } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -379,7 +385,13 @@ export default function ChatScreen() {
     try {
       const response = await api.get('/chat/conversations');
       if (response.data?.success) {
-        setConversations(response.data.data);
+        // Sort conversations: latest message first
+        const sorted = response.data.data.sort((a, b) => {
+          const dateA = new Date(a.lastMessage?.createdAt || 0);
+          const dateB = new Date(b.lastMessage?.createdAt || 0);
+          return dateB - dateA; // Descending (latest first)
+        });
+        setConversations(sorted);
       }
     } catch (error) {
       console.error('Load conversations error:', error);
@@ -414,6 +426,13 @@ export default function ChatScreen() {
     setSelectedConversation(null);
     loadConversations();
   };
+
+  useEffect(() => {
+    const starter = route?.params?.startWithUser;
+    if (!starter || !starter.id) return;
+
+    setSelectedConversation(starter);
+  }, [route?.params?.startWithUser]);
 
   if (!isAuthenticated) {
     return (

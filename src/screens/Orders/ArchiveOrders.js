@@ -10,18 +10,32 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { getOrders, SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES } from '../../utils/orderService';
+import { formatDate, formatTimeRange } from '../../utils/formatters';
 
 const ArchiveOrders = ({ navigation }) => {
   const { t } = useLanguage();
+  const { userRole } = useAuth();
   const [orders, setOrders] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const fetchOrders = useCallback(async () => {
     try {
-      const data = await getOrders({ status: ['completed', 'archived', 'cancelled'] });
+      let data = await getOrders({ status: ['completed', 'archived', 'cancelled'] });
+      
+      // Sort by date descending (latest first)
+      data = (data || []).sort((a, b) => {
+        const dateA = new Date(a.date || a.createdAt);
+        const dateB = new Date(b.date || b.createdAt);
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateB.getTime() - dateA.getTime();
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+      
       setOrders(data);
     } catch (error) {
       console.error('Error fetching archived orders:', error);
@@ -45,6 +59,14 @@ const ArchiveOrders = ({ navigation }) => {
     setRefreshing(false);
   };
 
+  const formatClientLocation = (client) => {
+    if (!client) return '';
+    const parts = [];
+    if (client.city) parts.push(client.city);
+    if (client.zipCode) parts.push(client.zipCode);
+    return parts.join(' • ');
+  };
+
   const renderOrderCard = ({ item }) => {
     const statusInfo = ORDER_STATUSES[item.status] || ORDER_STATUSES.archived;
     return (
@@ -61,12 +83,9 @@ const ArchiveOrders = ({ navigation }) => {
             <Text style={[styles.statusText, { color: statusInfo.color }]}>{statusInfo.label}</Text>
           </View>
         </View>
-        {item.cleaningCategory && (
-          <Text style={styles.category}>{CLEANING_CATEGORIES[item.cleaningCategory]}</Text>
-        )}
         <View style={styles.detailRow}>
           <Ionicons name="calendar-outline" size={15} color={colors.textLight} />
-          <Text style={styles.detailText}>{item.date || '—'}</Text>
+          <Text style={styles.detailText}>{formatDate(item.date)}  •  {formatTimeRange(item.time, item.endTime)}</Text>
         </View>
         <View style={styles.detailRow}>
           <Ionicons name="time-outline" size={15} color={colors.textLight} />
@@ -74,6 +93,15 @@ const ArchiveOrders = ({ navigation }) => {
             {item.calculatedHours || item.manualHours || '–'} {t('admin.hours', 'hours')}
           </Text>
         </View>
+        {userRole === 'cleaner' && item.client?.name ? (
+          <View style={styles.detailRow}>
+            <Ionicons name="person-outline" size={15} color={colors.textLight} />
+            <Text style={styles.detailText}>
+              {t('cleaner.client', 'Client')}: {item.client.name}
+              {formatClientLocation(item.client) ? ` • ${formatClientLocation(item.client)}` : ''}
+            </Text>
+          </View>
+        ) : null}
       </TouchableOpacity>
     );
   };

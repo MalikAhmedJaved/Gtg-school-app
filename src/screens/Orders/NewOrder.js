@@ -528,7 +528,7 @@ const NewOrder = ({ navigation, route }) => {
     setEventForm((prev) => ({
       ...prev,
       ...source,
-      title: source.title || order.address || '',
+      title: selectedServiceTypeLabel,
       date: dateStr,
       startTime: order.time || source.startTime || '09:00',
       endTime: source.endTime || order.time || source.startTime || '09:30',
@@ -671,6 +671,10 @@ const NewOrder = ({ navigation, route }) => {
     { value: 'commercial', label: t('newOrder.commercialCleaning', 'Commercial Cleaning') },
     { value: 'moveinout', label: t('newOrder.moveInOut', 'Move-in/Move-out') },
   ]);
+  const selectedServiceTypeLabel = useMemo(() => {
+    const selected = serviceTypeOptions.find((option) => option.value === order.serviceType);
+    return selected?.label || order.serviceType || t('scheduling.titlePlaceholder', 'Cleaning service');
+  }, [serviceTypeOptions, order.serviceType, t]);
 
   // --- Cleaning category options (only for home) ---
   const [cleaningCategoryOptions, setCleaningCategoryOptions] = useState([
@@ -749,6 +753,23 @@ const NewOrder = ({ navigation, route }) => {
   ];
 
   const isHome = order.serviceType === 'home';
+
+  useEffect(() => {
+    if (!order.serviceType) return;
+
+    setEventForm((prev) => ({
+      ...prev,
+      title: selectedServiceTypeLabel,
+    }));
+
+    setSavedEventData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        title: selectedServiceTypeLabel,
+      };
+    });
+  }, [order.serviceType, selectedServiceTypeLabel]);
 
   const updateServiceTypeLabel = (value, label) => {
     setServiceTypeOptions((prev) => prev.map((item) => (item.value === value ? { ...item, label } : item)));
@@ -1568,16 +1589,26 @@ const NewOrder = ({ navigation, route }) => {
             animationType="fade"
             onRequestClose={() => setShowNewEvent(false)}
           >
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalCard, { width: modalWidth }]}> 
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{t('scheduling.newEvent', 'New event')}</Text>
-                  <TouchableOpacity onPress={() => setShowNewEvent(false)}>
-                    <Text style={styles.modalClose}>×</Text>
-                  </TouchableOpacity>
-                </View>
+            <KeyboardAvoidingView
+              style={styles.modalKeyboardWrap}
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={[styles.modalCard, { width: modalWidth }]}> 
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>{t('scheduling.newEvent', 'New event')}</Text>
+                    <TouchableOpacity onPress={() => setShowNewEvent(false)}>
+                      <Text style={styles.modalClose}>×</Text>
+                    </TouchableOpacity>
+                  </View>
 
-                <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+                  <ScrollView
+                    style={styles.modalBody}
+                    contentContainerStyle={styles.modalBodyContent}
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                  >
                   <Text style={styles.inputLabel}>{t('scheduling.title', 'Title')}</Text>
                   <TextInput
                     style={styles.input}
@@ -1881,17 +1912,19 @@ const NewOrder = ({ navigation, route }) => {
                     onChangeText={(value) => updateEventForm('comments', value)}
                     multiline
                     numberOfLines={3}
+                    textAlignVertical="top"
                   />
 
                   {eventError ? <Text style={styles.eventError}>{eventError}</Text> : null}
 
-                  <View style={styles.modalActions}>
-                    <Button title={t('scheduling.saveEvent', 'Save')} onPress={handleSaveNewEvent} variant="primary" />
-                    <Button title={t('common.cancel', 'Cancel')} onPress={() => setShowNewEvent(false)} variant="secondary" />
-                  </View>
-                </ScrollView>
+                    <View style={styles.modalActions}>
+                      <Button title={t('scheduling.saveEvent', 'Save')} onPress={handleSaveNewEvent} variant="primary" />
+                      <Button title={t('common.cancel', 'Cancel')} onPress={() => setShowNewEvent(false)} variant="secondary" />
+                    </View>
+                  </ScrollView>
+                </View>
               </View>
-            </View>
+            </KeyboardAvoidingView>
           </Modal>
 
           {/* Date Events Modal */}
@@ -2310,6 +2343,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.md,
   },
+  modalKeyboardWrap: {
+    flex: 1,
+  },
   modalCard: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.lg,
@@ -2338,6 +2374,9 @@ const styles = StyleSheet.create({
   modalBody: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  modalBodyContent: {
+    paddingBottom: spacing.xl,
   },
   dateEventCard: {
     backgroundColor: colors.gray[50] || '#f9fafb',

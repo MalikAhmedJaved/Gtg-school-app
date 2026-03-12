@@ -59,6 +59,9 @@ const AdminDashboard = ({ route }) => {
   const [showCleanerDropdown, setShowCleanerDropdown] = useState(false);
   const [modalSelectedCleaner, setModalSelectedCleaner] = useState(null);
 
+  const [selectedArchiveTask, setSelectedArchiveTask] = useState(null);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+
   const [jobSeekers, setJobSeekers] = useState([]);
   const [jobSeekersLoading, setJobSeekersLoading] = useState(false);
   const [selectedJobSeeker, setSelectedJobSeeker] = useState(null);
@@ -115,8 +118,17 @@ const AdminDashboard = ({ route }) => {
         api.get('/tasks'),
         api.get('/tasks/pending'),
       ]);
-      setAllTasks(allRes.data?.success ? (allRes.data.data || []) : []);
-      setPendingTasks(pendingRes.data?.success ? (pendingRes.data.data || []) : []);
+      const all = allRes.data?.success ? (allRes.data.data || []) : [];
+      const pending = pendingRes.data?.success ? (pendingRes.data.data || []) : [];
+
+      const sortByCreatedDesc = (arr) => [...arr].sort((a, b) => {
+        const aDate = new Date(a.createdAt || a.date || 0).getTime();
+        const bDate = new Date(b.createdAt || b.date || 0).getTime();
+        return bDate - aDate;
+      });
+
+      setAllTasks(sortByCreatedDesc(all));
+      setPendingTasks(sortByCreatedDesc(pending));
     } catch (error) {
       setErrorMessage(error.response?.data?.message || 'Failed to load tasks');
       setAllTasks([]);
@@ -547,7 +559,7 @@ const AdminDashboard = ({ route }) => {
                 <View style={styles.detailRowInline}>
                   <View style={styles.detailHalf}>
                     <Text style={styles.detailLabel}>📅 Date</Text>
-                    <Text style={styles.detailValue}>{formatTaskDate(task.date)}</Text>
+                    <Text style={styles.detailValue}>{formatTaskDate(task.createdAt || task.date)}</Text>
                   </View>
                   <View style={styles.detailHalf}>
                     <Text style={styles.detailLabel}>🕐 Time</Text>
@@ -605,6 +617,7 @@ const AdminDashboard = ({ route }) => {
                     <Text style={styles.detailValue}>{task.comments}</Text>
                   </View>
                 ) : null}
+
               </View>
 
               {/* Client Info */}
@@ -795,7 +808,7 @@ const AdminDashboard = ({ route }) => {
             </View>
           ) : null}
           <View style={styles.taskMetaRow}>
-            <Text style={styles.taskDate}>📅 {formatTaskDate(task.date)}</Text>
+            <Text style={styles.taskDate}>📅 {formatTaskDate(task.createdAt || task.date)}</Text>
             <Text style={styles.taskTime}>🕐 {formatTimeRange(task.time, task.endTime)}</Text>
           </View>
           <Text style={styles.taskClient}>👤 {task.client?.name || '-'}</Text>
@@ -1064,8 +1077,163 @@ const AdminDashboard = ({ route }) => {
     </View>
   );
 
+  const renderArchiveModal = () => {
+    const task = selectedArchiveTask;
+    if (!task) return null;
+    return (
+      <Modal visible={showArchiveModal} animationType="slide" transparent onRequestClose={() => { setShowArchiveModal(false); setSelectedArchiveTask(null); }}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            {/* Header */}
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Task #{task.id}</Text>
+                <View style={[styles.statusBadge, { backgroundColor: '#d1fae520' }]}>
+                  <View style={[styles.statusDot, { backgroundColor: '#065f46' }]} />
+                  <Text style={[styles.statusBadgeText, { color: '#065f46' }]}>Completed</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => { setShowArchiveModal(false); setSelectedArchiveTask(null); }}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {/* Task Details */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Task Details</Text>
+                {task.title ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Title</Text>
+                    <Text style={styles.detailValue}>{task.title}</Text>
+                  </View>
+                ) : null}
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>📍 Address</Text>
+                  <Text style={styles.detailValue}>{task.address || '-'}</Text>
+                </View>
+                <View style={styles.detailRowInline}>
+                  <View style={styles.detailHalf}>
+                    <Text style={styles.detailLabel}>📅 Date</Text>
+                    <Text style={styles.detailValue}>{formatTaskDate(task.date)}</Text>
+                  </View>
+                  <View style={styles.detailHalf}>
+                    <Text style={styles.detailLabel}>🕐 Time</Text>
+                    <Text style={styles.detailValue}>{formatTimeRange(task.time, task.endTime)}</Text>
+                  </View>
+                </View>
+                <View style={styles.detailRowInline}>
+                  <View style={styles.detailHalf}>
+                    <Text style={styles.detailLabel}>⏱ Hours</Text>
+                    <Text style={styles.detailValue}>{task.actualHours || task.hours || '-'}</Text>
+                  </View>
+                  <View style={styles.detailHalf}>
+                    <Text style={styles.detailLabel}>🧹 Type</Text>
+                    <Text style={styles.detailValue}>{cleaningTypeLabels[task.cleaningType] || task.cleaningType || '-'}</Text>
+                  </View>
+                </View>
+                {task.isRecurring ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>🔄 Recurring</Text>
+                    <Text style={styles.detailValue}>
+                      Every {task.recurrenceEvery ?? 1} week(s){task.recurrenceCount ? ` • ${task.recurrenceCount} tasks total` : ''}
+                    </Text>
+                  </View>
+                ) : null}
+                {task.comments ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>💬 Comments</Text>
+                    <Text style={styles.detailValue}>{task.comments}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Client Info */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Client Information</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>👤 Name</Text>
+                  <Text style={styles.detailValue}>{task.client?.name || '-'}</Text>
+                </View>
+                {task.client?.email ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>📧 Email</Text>
+                    <Text style={styles.detailValue}>{task.client.email}</Text>
+                  </View>
+                ) : null}
+                {task.client?.phone ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>📞 Phone</Text>
+                    <Text style={styles.detailValue}>{task.client.phone}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Cleaner Info */}
+              {task.cleaner ? (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Cleaner Information</Text>
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>🧹 Name</Text>
+                    <Text style={styles.detailValue}>{task.cleaner.name || '-'}</Text>
+                  </View>
+                  {task.cleaner.email ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>📧 Email</Text>
+                      <Text style={styles.detailValue}>{task.cleaner.email}</Text>
+                    </View>
+                  ) : null}
+                  {task.cleaner.phone ? (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>📞 Phone</Text>
+                      <Text style={styles.detailValue}>{task.cleaner.phone}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* Checklist */}
+              {task.checklist && (() => {
+                try {
+                  const items = typeof task.checklist === 'string' ? JSON.parse(task.checklist) : task.checklist;
+                  if (Array.isArray(items) && items.length > 0) {
+                    const completed = task.checklistCompleted ? (typeof task.checklistCompleted === 'string' ? JSON.parse(task.checklistCompleted) : task.checklistCompleted) : [];
+                    return (
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>Checklist</Text>
+                        {items.map((item, idx) => (
+                          <View key={idx} style={styles.checklistItem}>
+                            <Text style={styles.checklistIcon}>{completed[idx] ? '☑' : '☐'}</Text>
+                            <Text style={styles.checklistText}>{item}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    );
+                  }
+                } catch { /* ignore */ }
+                return null;
+              })()}
+
+              {/* Rating */}
+              {task.rating ? (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailSectionTitle}>Rating & Review</Text>
+                  <Text style={styles.detailValue}>{'⭐'.repeat(task.rating)} ({task.rating}/5)</Text>
+                  {task.ratingComment ? <Text style={styles.detailValue}>{task.ratingComment}</Text> : null}
+                </View>
+              ) : null}
+
+              <View style={{ height: spacing.xl }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   const renderArchivesTab = () => (
     <View style={styles.contentSection}>
+      {renderArchiveModal()}
       <Text style={styles.sectionTitle}>{t('dashboard.archives', 'Archives')}</Text>
       <TouchableOpacity style={styles.refreshBtn} onPress={fetchCompletedTasks}>
         <Text style={styles.refreshText}>Refresh Archives</Text>
@@ -1075,7 +1243,7 @@ const AdminDashboard = ({ route }) => {
       {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
       {completedTasks.map((task) => (
-        <View key={`c-${task.id}`} style={styles.taskCard}>
+        <TouchableOpacity key={`c-${task.id}`} style={styles.taskCard} onPress={() => { setSelectedArchiveTask(task); setShowArchiveModal(true); }} activeOpacity={0.75}>
           <View style={styles.taskHeader}>
             <Text style={styles.taskId}>Task #{task.id}</Text>
             <Text style={styles.statusCompleted}>✅ Completed</Text>
@@ -1084,7 +1252,7 @@ const AdminDashboard = ({ route }) => {
           <Text style={styles.taskDate}>📅 {formatDate(task.date)}</Text>
           <Text style={styles.taskClient}>👤 Client: {task.client?.name || '-'}</Text>
           <Text style={styles.taskCleaner}>🧹 Cleaner: {task.cleaner?.name || '-'}</Text>
-        </View>
+        </TouchableOpacity>
       ))}
     </View>
   );
@@ -1111,19 +1279,25 @@ const AdminDashboard = ({ route }) => {
       <DashboardSidebar menuItems={menuItems} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       <View style={[styles.mainContent, !sidebarOpen && styles.mainContentFull]}>
-        <View style={[styles.mobileHeader, { paddingTop: Math.max(insets.top, spacing.md) }]}>
-          <TouchableOpacity style={styles.menuButton} onPress={() => setSidebarOpen(!sidebarOpen)}>
-            <Text style={styles.menuIcon}>☰</Text>
-          </TouchableOpacity>
-          <Text style={styles.mobileTitle}>{t('dashboard.adminDashboard', 'Admin Dashboard')}</Text>
-          <View style={styles.headerSpacer} />
-        </View>
+        {/* Hide header for users, jobseekers, and archives tabs */}
+        {activeTab !== 'users' && activeTab !== 'jobseekers' && activeTab !== 'archives' && (
+          <View style={[styles.mobileHeader, { paddingTop: Math.max(insets.top, spacing.md) }]}>
+            <TouchableOpacity style={styles.menuButton} onPress={() => setSidebarOpen(!sidebarOpen)}>
+              <Text style={styles.menuIcon}>☰</Text>
+            </TouchableOpacity>
+            <Text style={styles.mobileTitle}>{t('dashboard.adminDashboard', 'Admin Dashboard')}</Text>
+            <View style={styles.headerSpacer} />
+          </View>
+        )}
 
         <ScrollView style={styles.scrollContent} contentContainerStyle={styles.scrollContentContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.dashboardContainer}>
-            <View style={styles.headerWrapper}>
-              <Text style={styles.desktopTitle}>{t('dashboard.adminDashboard', 'Admin Dashboard')}</Text>
-            </View>
+            {/* Hide desktop title for users, jobseekers, and archives tabs */}
+            {activeTab !== 'users' && activeTab !== 'jobseekers' && activeTab !== 'archives' && (
+              <View style={styles.headerWrapper}>
+                <Text style={styles.desktopTitle}>{t('dashboard.adminDashboard', 'Admin Dashboard')}</Text>
+              </View>
+            )}
 
             {activeTab === 'profile' ? (
               <View style={styles.contentWrapper}>

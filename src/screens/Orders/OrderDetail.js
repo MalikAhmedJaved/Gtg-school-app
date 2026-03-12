@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,12 +6,17 @@ import {
   ScrollView,
   SafeAreaView,
   Alert,
+  Image,
+  ActivityIndicator,
+  TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
-import { SERVICE_TYPES, CLEANING_CATEGORIES, ORDER_STATUSES, getOrderById } from '../../utils/orderService';
+import { SERVICE_TYPES, ORDER_STATUSES, getOrderById, getCleanerReviews, completeOrder, rateOrder } from '../../utils/orderService';
 import SectionCard from '../../components/Common/SectionCard';
 import Button from '../../components/Common/Button';
 import { formatDate, formatTimeRange } from '../../utils/formatters';
@@ -21,12 +26,98 @@ import api from '../../utils/api';
 const OrderDetail = ({ route, navigation }) => {
   const { t } = useLanguage();
   const { userRole } = useAuth();
+  const { showToast } = useToast();
   const [order, setOrder] = useState(route.params.order);
   const [accepting, setAccepting] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [showCompleteForm, setShowCompleteForm] = useState(false);
+  const [checklistCompleted, setChecklistCompleted] = useState([]);
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [loadingCleanerMeta, setLoadingCleanerMeta] = useState(false);
+  const [cleanerReviews, setCleanerReviews] = useState({ averageRating: null, count: 0, reviews: [] });
 
   const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
   const canEditPending = userRole === 'client' && order.status === 'pending';
   const canCleanerAccept = userRole === 'cleaner' && order.status === 'assigned';
+  const canCleanerComplete = userRole === 'cleaner' && order.status === 'accepted';
+  const canClientViewCleaner = userRole === 'client' && ['assigned', 'accepted'].includes(order.status) && Boolean(order.cleaner?.id);
+  const canClientRate = userRole === 'client' && order.status === 'completed' && Boolean(order.cleaner?.id) && !order.rating && order.canRate;
+  const checklistItems = Array.isArray(order.checklist) ? order.checklist : [];
+
+  useEffect(() => {
+    let mounted = true;
+    const taskId = route?.params?.order?.id || order?.id || order?._id;
+    if (!taskId) return () => { mounted = false; };
+
+    const loadOrderMeta = async () => {
+      const shouldLoadCleanerReviews = userRole === 'client' && ['assigned', 'accepted'].includes(order.status);
+      if (shouldLoadCleanerReviews) {
+        setLoadingCleanerMeta(true);
+      }
+
+      try {
+        const latest = await getOrderById(taskId);
+        if (!mounted || !latest) return;
+
+        setOrder((prev) => ({ ...prev, ...latest }));
+
+        const cleanerId = latest?.cleaner?.id;
+        if (shouldLoadCleanerReviews && cleanerId) {
+          const reviews = await getCleanerReviews(cleanerId);
+          if (mounted) {
+            setCleanerReviews(reviews);
+          }
+        }
+      } finally {
+        if (mounted && shouldLoadCleanerReviews) setLoadingCleanerMeta(false);
+      }
+    };
+
+    loadOrderMeta();
+    return () => { mounted = false; };
+  }, [route?.params?.order?.id, order?.id, order?._id, order.status, userRole]);
+
+  useEffect(() => {
+    setChecklistCompleted(checklistItems.map(() => false));
+  }, [order.id, order._id, checklistItems.length]);
+
+  const getCleanerPhotoUri = () => {
+    const photo = order?.cleaner?.photo;
+    if (!photo || typeof photo !== 'string') return null;
+    if (photo.startsWith('data:image') || photo.startsWith('http://') || photo.startsWith('https://')) return photo;
+    if (/^[A-Za-z0-9+/=\n\r]+$/.test(photo) && photo.length > 100) {
+      return `data:image/jpeg;base64,${photo.replace(/\s/g, '')}`;
+    }
+    if (photo.startsWith('/')) {
+      const apiBase = String(api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+      return `${apiBase}${photo}`;
+    }
+    if (photo.startsWith('uploads/')) {
+      const apiBase = String(api.defaults.baseURL || '').replace(/\/api\/?$/, '');
+      return `${apiBase}/${photo}`;
+    }
+    return null;
+  };
+
+  const openCleanerChat = () => {
+    if (!order?.cleaner?.id) return;
+
+    rootNavigate('MessagesTab', {
+      startWithUser: {
+        id: order.cleaner.id,
+        name: order.cleaner.name || t('cleaner.cleaner', 'Cleaner'),
+        role: 'cleaner',
+      },
+    });
+  };
+
+  const renderStars = (value) => {
+    const rating = Math.max(0, Math.min(5, Number(value) || 0));
+    const full = Math.round(rating);
+    return `${'★'.repeat(full)}${'☆'.repeat(Math.max(0, 5 - full))}`;
+  };
 
   const renderList = (items, label) => {
     if (!items || items.length === 0) return null;
@@ -120,6 +211,103 @@ const OrderDetail = ({ route, navigation }) => {
     }
   };
 
+  const toggleChecklistItem = (index) => {
+    setChecklistCompleted((prev) => prev.map((value, idx) => (idx === index ? !value : value)));
+  };
+
+  const handleCompleteTask = async () => {
+    const taskId = order.id || order._id;
+    if (!taskId || completing) return;
+
+    setCompleting(true);
+    try {
+      const updated = await completeOrder(taskId, {
+        checklistCompleted,
+      });
+      setOrder((prev) => ({ ...prev, ...updated }));
+      setShowCompleteForm(false);
+      showToast(t('cleaner.taskCompleted', 'Task marked as completed!'), 'success');
+      Alert.alert('Success', t('cleaner.taskCompleted', 'Task marked as completed!'));
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || error.message || t('cleaner.errorCompleting', 'Error completing task. Please try again.'));
+    } finally {
+      setCompleting(false);
+    }
+  };
+
+  const handleSubmitRating = async () => {
+    const taskId = order.id || order._id;
+    if (!taskId || !rating || submittingRating) return;
+
+    setSubmittingRating(true);
+    try {
+      const updated = await rateOrder(taskId, {
+        rating,
+        ratingComment,
+      });
+      setOrder((prev) => ({ ...prev, ...updated }));
+      showToast(t('client.thankYou', 'Thank you for your feedback!'), 'success');
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || error.message || t('client.errorRating', 'Error submitting rating. Please try again.'));
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
+  const renderRatingSection = () => {
+    if (userRole !== 'client' || order.status !== 'completed' || !order.cleaner?.id) return null;
+
+    if (order.rating) {
+      return (
+        <SectionCard title={t('client.yourRating', 'Your Rating')}>
+          <Text style={styles.valueText}>{renderStars(order.rating)} {order.rating} {t('client.outOf5', 'out of 5')}</Text>
+          {order.ratingComment ? <Text style={styles.commentText}>{order.ratingComment}</Text> : null}
+        </SectionCard>
+      );
+    }
+
+    if (!canClientRate) {
+      return order.ratingBlockedReason ? (
+        <SectionCard title={t('client.rateService', 'Rate Your Cleaning Service')}>
+          <Text style={styles.helperText}>{order.ratingBlockedReason}</Text>
+        </SectionCard>
+      ) : null;
+    }
+
+    return (
+      <SectionCard title={t('client.rateService', 'Rate Your Cleaning Service')}>
+        <Text style={styles.helperText}>{t('client.ratePrompt', 'How was your experience? Please rate and leave a comment to help us improve!')}</Text>
+        <View style={styles.ratingRow}>
+          {[1, 2, 3, 4, 5].map((value) => (
+            <TouchableOpacity key={value} onPress={() => setRating(value)} style={styles.starButton}>
+              <Ionicons
+                name={value <= rating ? 'star' : 'star-outline'}
+                size={28}
+                color={value <= rating ? '#f59e0b' : colors.gray[400]}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TextInput
+          style={styles.commentInput}
+          placeholder={t('client.yourComment', 'Your Comment')}
+          value={ratingComment}
+          onChangeText={setRatingComment}
+          multiline
+          numberOfLines={4}
+          textAlignVertical="top"
+        />
+        <Button
+          title={t('client.submitRating', 'Submit Rating')}
+          onPress={handleSubmitRating}
+          disabled={!rating || submittingRating}
+          loading={submittingRating}
+          variant="primary"
+        />
+      </SectionCard>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -149,18 +337,59 @@ const OrderDetail = ({ route, navigation }) => {
           </View>
         ) : null}
 
+        {canCleanerComplete ? (
+          <View style={styles.actionBar}>
+            {!showCompleteForm ? (
+              <Button
+                title={t('cleaner.markAsCompleted', 'Mark the Order Complete')}
+                onPress={() => setShowCompleteForm(true)}
+                variant="success"
+              />
+            ) : (
+              <SectionCard title={t('cleaner.markWhatYouCompleted', 'Mark what you completed')}>
+                {checklistItems.length > 0 ? checklistItems.map((item, index) => (
+                  <TouchableOpacity
+                    key={`${item}-${index}`}
+                    style={styles.checkToggleRow}
+                    onPress={() => toggleChecklistItem(index)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name={checklistCompleted[index] ? 'checkbox' : 'square-outline'}
+                      size={22}
+                      color={checklistCompleted[index] ? colors.secondary : colors.textLight}
+                    />
+                    <Text style={styles.checkToggleText}>{item}</Text>
+                  </TouchableOpacity>
+                )) : (
+                  <Text style={styles.helperText}>{t('cleaner.completeTask', 'Complete Task')}</Text>
+                )}
+
+                <View style={styles.inlineActions}>
+                  <Button
+                    title={t('cleaner.completeTask', 'Complete Task')}
+                    onPress={handleCompleteTask}
+                    loading={completing}
+                    disabled={completing}
+                    variant="success"
+                    style={styles.inlineActionButton}
+                  />
+                  <Button
+                    title={t('common.cancel', 'Cancel')}
+                    onPress={() => setShowCompleteForm(false)}
+                    variant="secondary"
+                    style={styles.inlineActionButton}
+                  />
+                </View>
+              </SectionCard>
+            )}
+          </View>
+        ) : null}
+
         <SectionCard title={t('newOrder.serviceType', 'Service Type')}>
           <Text style={styles.valueText}>
             {SERVICE_TYPES[order.serviceType] || order.serviceType}
           </Text>
-          {order.cleaningCategory && (
-            <>
-              <Text style={styles.subLabel}>{t('newOrder.cleaningCategory', 'Category')}</Text>
-              <Text style={styles.valueText}>
-                {CLEANING_CATEGORIES[order.cleaningCategory] || order.cleaningCategory}
-              </Text>
-            </>
-          )}
         </SectionCard>
 
         {userRole === 'cleaner' && order.client ? (
@@ -171,16 +400,69 @@ const OrderDetail = ({ route, navigation }) => {
                 <Text style={styles.detailValue}>{order.client.name}</Text>
               </View>
             ) : null}
-            {order.client.email ? (
+            {order.client.city ? (
               <View style={styles.detailRow}>
-                <Ionicons name="mail-outline" size={18} color={colors.primary} />
-                <Text style={styles.detailValue}>{order.client.email}</Text>
+                <Ionicons name="location-outline" size={18} color={colors.primary} />
+                <Text style={styles.detailValue}>{order.client.city}{order.client.zipCode ? `, ${order.client.zipCode}` : ''}</Text>
+              </View>
+            ) : order.client.zipCode ? (
+              <View style={styles.detailRow}>
+                <Ionicons name="location-outline" size={18} color={colors.primary} />
+                <Text style={styles.detailValue}>{order.client.zipCode}</Text>
               </View>
             ) : null}
-            {order.client.phone ? (
-              <View style={styles.detailRow}>
-                <Ionicons name="call-outline" size={18} color={colors.primary} />
-                <Text style={styles.detailValue}>{order.client.phone}</Text>
+          </SectionCard>
+        ) : null}
+
+        {canClientViewCleaner ? (
+          <SectionCard title={t('orders.cleanerInfo', 'Assigned Cleaner')}>
+            {loadingCleanerMeta ? (
+              <View style={styles.loaderRow}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.loaderText}>{t('common.loading', 'Loading...')}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.cleanerHeaderRow}>
+              {getCleanerPhotoUri() ? (
+                <Image source={{ uri: getCleanerPhotoUri() }} style={styles.cleanerPhoto} />
+              ) : (
+                <View style={styles.cleanerAvatarFallback}>
+                  <Text style={styles.cleanerAvatarFallbackText}>
+                    {(order.cleaner?.name || '?').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.cleanerMeta}>
+                <Text style={styles.cleanerName}>{order.cleaner?.name || t('cleaner.cleaner', 'Cleaner')}</Text>
+                {typeof cleanerReviews?.averageRating === 'number' ? (
+                  <Text style={styles.cleanerRatingSummary}>
+                    {renderStars(cleanerReviews.averageRating)}  {cleanerReviews.averageRating.toFixed(1)} ({cleanerReviews.count})
+                  </Text>
+                ) : (
+                  <Text style={styles.cleanerNoReviews}>{t('orders.noReviews', 'No reviews yet')}</Text>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.chatButtonWrap}>
+              <Button title={t('chat.chatWithCleaner', 'Chat with Cleaner')} onPress={openCleanerChat} variant="primary" />
+            </View>
+
+            {Array.isArray(cleanerReviews?.reviews) && cleanerReviews.reviews.length > 0 ? (
+              <View style={styles.reviewsSection}>
+                <Text style={styles.reviewsTitle}>{t('orders.reviews', 'Reviews')}</Text>
+                {cleanerReviews.reviews.slice(0, 3).map((review) => (
+                  <View key={String(review.id)} style={styles.reviewCard}>
+                    <Text style={styles.reviewStars}>{renderStars(review.rating)}  {Number(review.rating).toFixed(1)}</Text>
+                    {review.ratingComment ? (
+                      <Text style={styles.reviewComment}>{review.ratingComment}</Text>
+                    ) : null}
+                    <Text style={styles.reviewMeta}>
+                      {(review.client?.name || t('orders.client', 'Client'))} • {formatDate(review.completedAt || review.date)}
+                    </Text>
+                  </View>
+                ))}
               </View>
             ) : null}
           </SectionCard>
@@ -260,6 +542,8 @@ const OrderDetail = ({ route, navigation }) => {
           </SectionCard>
         ) : null}
 
+        {renderRatingSection()}
+
         {order.createdAt && (
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('orders.orderDate', 'Order Date')}</Text>
@@ -322,6 +606,96 @@ const styles = StyleSheet.create({
     marginLeft: spacing.sm,
     flex: 1,
   },
+  loaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  loaderText: {
+    marginLeft: spacing.xs,
+    color: colors.textLight,
+    fontSize: typography.fontSize.sm,
+  },
+  cleanerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  cleanerPhoto: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.gray[200],
+    marginRight: spacing.sm,
+  },
+  cleanerAvatarFallback: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  cleanerAvatarFallbackText: {
+    color: colors.white,
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+  },
+  cleanerMeta: {
+    flex: 1,
+  },
+  cleanerName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text,
+  },
+  cleanerRatingSummary: {
+    marginTop: 2,
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+  },
+  cleanerNoReviews: {
+    marginTop: 2,
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+  },
+  chatButtonWrap: {
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  reviewsSection: {
+    marginTop: spacing.sm,
+  },
+  reviewsTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  reviewCard: {
+    borderWidth: 1,
+    borderColor: colors.gray[200],
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
+    backgroundColor: colors.gray[50],
+  },
+  reviewStars: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  reviewComment: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  reviewMeta: {
+    fontSize: typography.fontSize.xs,
+    color: colors.textLight,
+  },
   listSection: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
@@ -352,6 +726,49 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: colors.text,
     lineHeight: 22,
+  },
+  helperText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+    lineHeight: 20,
+  },
+  inlineActions: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  inlineActionButton: {
+    flex: 1,
+  },
+  checkToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+  },
+  checkToggleText: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    fontSize: typography.fontSize.md,
+    color: colors.text,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  starButton: {
+    marginRight: spacing.xs,
+  },
+  commentInput: {
+    minHeight: 110,
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: typography.fontSize.md,
+    color: colors.text,
+    backgroundColor: colors.white,
+    marginBottom: spacing.sm,
   },
   metaRow: {
     flexDirection: 'row',

@@ -46,14 +46,6 @@ const OrderConfirmation = ({ route }) => {
                 {SERVICE_TYPES[order.serviceType] || order.serviceType}
               </Text>
             </View>
-            {order.cleaningCategory && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{t('newOrder.cleaningCategory', 'Category')}</Text>
-                <Text style={styles.summaryValue}>
-                  {CLEANING_CATEGORIES[order.cleaningCategory] || order.cleaningCategory}
-                </Text>
-              </View>
-            )}
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{t('newOrder.address', 'Address')}</Text>
               <Text style={styles.summaryValue}>{order.address}</Text>

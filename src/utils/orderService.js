@@ -66,6 +66,29 @@ const KNOWN_EXTRA_TARGETED = ['animalHair', 'smoking'];
 const EQUIPMENT_PREFIX = 'equipment:';
 const EQUIPMENT_KEYS = ['cleaningAgents', 'cloth', 'vacuumCleaner', 'mop', 'specialProducts'];
 
+const getOrderScheduleTimestamp = (order) => {
+  if (!order?.date) return 0;
+
+  const dateOnly = String(order.date).split('T')[0];
+  const timeValue = order.time || '00:00';
+  const timestamp = new Date(`${dateOnly}T${timeValue}`).getTime();
+
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+export const sortOrdersBySchedule = (orders, direction = 'asc') => {
+  const multiplier = direction === 'desc' ? -1 : 1;
+
+  return [...(Array.isArray(orders) ? orders : [])].sort((left, right) => {
+    const delta = getOrderScheduleTimestamp(left) - getOrderScheduleTimestamp(right);
+    if (delta !== 0) return delta * multiplier;
+
+    const leftCreated = left?.createdAt ? new Date(left.createdAt).getTime() : 0;
+    const rightCreated = right?.createdAt ? new Date(right.createdAt).getTime() : 0;
+    return (leftCreated - rightCreated) * multiplier;
+  });
+};
+
 const mapTaskToOrder = (task) => {
   const cleaningType = task.cleaningType;
   const serviceType = cleaningType === 'residential'
@@ -126,6 +149,9 @@ const mapTaskToOrder = (task) => {
     cleaner: task.cleaner,
     rating: task.rating,
     ratingComment: task.ratingComment,
+    canRate: Boolean(task.canRate),
+    allOccurrencesCompleted: task.allOccurrencesCompleted !== false,
+    ratingBlockedReason: task.ratingBlockedReason || '',
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
     completedAt: task.completedAt,
@@ -243,7 +269,8 @@ export const getOrders = async (filters = {}) => {
     const response = await api.get(endpoint, { params });
     if (response.data.success) {
       const tasks = Array.isArray(response.data.data) ? response.data.data : [response.data.data].filter(Boolean);
-      return tasks.map(mapTaskToOrder);
+      const mappedTasks = tasks.map(mapTaskToOrder);
+      return sortOrdersBySchedule(mappedTasks, 'desc');
     }
     return [];
   } catch (error) {
@@ -256,7 +283,8 @@ export const getOrders = async (filters = {}) => {
       orders = orders.filter((o) => statusArr.includes(o.status));
     }
 
-    return orders;
+    const statusArr = Array.isArray(filters.status) ? filters.status : [filters.status].filter(Boolean);
+    return sortOrdersBySchedule(orders, 'desc');
   }
 };
 
@@ -273,6 +301,35 @@ export const getOrderById = async (id) => {
     const orders = await getLocalOrders();
     return orders.find((o) => o._id === String(id)) || null;
   }
+};
+
+export const getCleanerReviews = async (cleanerId) => {
+  try {
+    const response = await api.get(`/tasks/cleaners/${cleanerId}/reviews`);
+    if (response.data?.success) {
+      return response.data.data || { averageRating: null, count: 0, reviews: [] };
+    }
+  } catch {
+    // Silent fallback
+  }
+
+  return { averageRating: null, count: 0, reviews: [] };
+};
+
+export const completeOrder = async (id, payload = {}) => {
+  const response = await api.post(`/tasks/${id}/complete`, payload);
+  if (response.data?.success) {
+    return mapTaskToOrder(response.data.data);
+  }
+  throw new Error(response.data?.message || 'Failed to complete task');
+};
+
+export const rateOrder = async (id, payload = {}) => {
+  const response = await api.post(`/tasks/${id}/rate`, payload);
+  if (response.data?.success) {
+    return mapTaskToOrder(response.data.data);
+  }
+  throw new Error(response.data?.message || 'Failed to submit rating');
 };
 
 // Cancel an order (task)

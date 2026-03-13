@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, Alert, SafeAreaView, KeyboardAvoidingView, Platform, Modal, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
@@ -26,6 +26,24 @@ const Register = () => {
   });
   const [loading, setLoading] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [showClientTypeModal, setShowClientTypeModal] = useState(false);
+
+  const roleOptions = [
+    { label: t('auth.selectRole', 'Select role'), value: '' },
+    { label: t('auth.client', 'Client'), value: 'client' },
+    { label: t('auth.cleaner', 'Cleaner'), value: 'cleaner' },
+  ];
+
+  const clientTypeOptions = [
+    { label: t('auth.selectClientType', 'Select client type'), value: '' },
+    { label: t('auth.private', 'Private'), value: 'private' },
+    { label: t('auth.company', 'Company'), value: 'company' },
+  ];
+
+  const getOptionLabel = (options, value, placeholder) => {
+    return options.find((opt) => opt.value === value)?.label || placeholder;
+  };
 
   const handleChange = (field, value) => {
     setFormData((prev) => {
@@ -236,40 +254,58 @@ const Register = () => {
 
             <View style={styles.inputGroup}>
               <Text style={styles.label}>{t('auth.registerAs', 'Register as')} *</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={formData.role}
-                  onValueChange={(value) => handleChange('role', value)}
-                  style={styles.picker}
-                  dropdownIconColor={colors.textDark}
-                  prompt={t('auth.registerAs', 'Register as')}
-                  mode="dropdown"
-                >
-                  <Picker.Item label={t('auth.selectRole', 'Select role')} value="" />
-                  <Picker.Item label={t('auth.client', 'Client')} value="client" />
-                  <Picker.Item label={t('auth.cleaner', 'Cleaner')} value="cleaner" />
-                </Picker>
-              </View>
+              {Platform.OS === 'ios' ? (
+                <TouchableOpacity style={styles.iosSelector} onPress={() => setShowRoleModal(true)}>
+                  <Text style={styles.iosSelectorText}>
+                    {getOptionLabel(roleOptions, formData.role, t('auth.selectRole', 'Select role'))}
+                  </Text>
+                  <Text style={styles.iosSelectorArrow}>⌄</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.pickerContainer}>
+                  <Picker
+                    selectedValue={formData.role}
+                    onValueChange={(value) => handleChange('role', value)}
+                    style={styles.picker}
+                    dropdownIconColor={colors.textDark}
+                    prompt={t('auth.registerAs', 'Register as')}
+                    mode="dropdown"
+                  >
+                    <Picker.Item label={t('auth.selectRole', 'Select role')} value="" />
+                    <Picker.Item label={t('auth.client', 'Client')} value="client" />
+                    <Picker.Item label={t('auth.cleaner', 'Cleaner')} value="cleaner" />
+                  </Picker>
+                </View>
+              )}
             </View>
 
             {formData.role === 'client' && (
               <>
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>{t('auth.clientType', 'Client Type')} *</Text>
-                  <View style={styles.pickerContainer}>
-                    <Picker
-                      selectedValue={formData.clientType}
-                      onValueChange={(value) => handleChange('clientType', value)}
-                      style={styles.picker}
-                      dropdownIconColor={colors.textDark}
-                      prompt={t('auth.clientType', 'Client Type')}
-                      mode="dropdown"
-                    >
-                      <Picker.Item label={t('auth.selectClientType', 'Select client type')} value="" />
-                      <Picker.Item label={t('auth.private', 'Private')} value="private" />
-                      <Picker.Item label={t('auth.company', 'Company')} value="company" />
-                    </Picker>
-                  </View>
+                  {Platform.OS === 'ios' ? (
+                    <TouchableOpacity style={styles.iosSelector} onPress={() => setShowClientTypeModal(true)}>
+                      <Text style={styles.iosSelectorText}>
+                        {getOptionLabel(clientTypeOptions, formData.clientType, t('auth.selectClientType', 'Select client type'))}
+                      </Text>
+                      <Text style={styles.iosSelectorArrow}>⌄</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.pickerContainer}>
+                      <Picker
+                        selectedValue={formData.clientType}
+                        onValueChange={(value) => handleChange('clientType', value)}
+                        style={styles.picker}
+                        dropdownIconColor={colors.textDark}
+                        prompt={t('auth.clientType', 'Client Type')}
+                        mode="dropdown"
+                      >
+                        <Picker.Item label={t('auth.selectClientType', 'Select client type')} value="" />
+                        <Picker.Item label={t('auth.private', 'Private')} value="private" />
+                        <Picker.Item label={t('auth.company', 'Company')} value="company" />
+                      </Picker>
+                    </View>
+                  )}
                 </View>
 
                 {formData.clientType === 'company' && (
@@ -318,6 +354,52 @@ const Register = () => {
               </Text>
             </View>
           </View>
+
+          <Modal visible={showRoleModal} transparent animationType="fade" onRequestClose={() => setShowRoleModal(false)}>
+            <View style={styles.modalBackdrop}>
+              <View style={styles.modalCard}>
+                <Text style={styles.modalTitle}>{t('auth.registerAs', 'Register as')}</Text>
+                {roleOptions.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value || 'empty-role'}
+                    style={styles.modalOption}
+                    onPress={() => {
+                      handleChange('role', opt.value);
+                      setShowRoleModal(false);
+                    }}
+                  >
+                    <Text style={styles.modalOptionText}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowRoleModal(false)}>
+                  <Text style={styles.modalCancelText}>{t('common.cancel', 'Cancel')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
+          <Modal visible={showClientTypeModal} transparent animationType="fade" onRequestClose={() => setShowClientTypeModal(false)}>
+            <View style={styles.modalBackdrop}>
+              <View style={styles.modalCard}>
+                <Text style={styles.modalTitle}>{t('auth.clientType', 'Client Type')}</Text>
+                {clientTypeOptions.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value || 'empty-client-type'}
+                    style={styles.modalOption}
+                    onPress={() => {
+                      handleChange('clientType', opt.value);
+                      setShowClientTypeModal(false);
+                    }}
+                  >
+                    <Text style={styles.modalOptionText}>{opt.label}</Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowClientTypeModal(false)}>
+                  <Text style={styles.modalCancelText}>{t('common.cancel', 'Cancel')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -393,6 +475,63 @@ const styles = StyleSheet.create({
     height: 50,
     color: colors.textDark,
     backgroundColor: colors.white,
+  },
+  iosSelector: {
+    borderWidth: 2,
+    borderColor: colors.gray[200],
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.white,
+    minHeight: 50,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  iosSelectorText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textDark,
+    flex: 1,
+  },
+  iosSelectorArrow: {
+    fontSize: typography.fontSize.lg,
+    color: colors.text,
+    marginLeft: spacing.sm,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    padding: spacing.lg,
+  },
+  modalCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+    marginBottom: spacing.md,
+  },
+  modalOption: {
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[100],
+  },
+  modalOptionText: {
+    fontSize: typography.fontSize.md,
+    color: colors.textDark,
+  },
+  modalCancelBtn: {
+    marginTop: spacing.md,
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+  },
+  modalCancelText: {
+    fontSize: typography.fontSize.md,
+    color: colors.primary,
+    fontWeight: typography.fontWeight.semibold,
   },
   submitButton: {
     marginTop: spacing.md,

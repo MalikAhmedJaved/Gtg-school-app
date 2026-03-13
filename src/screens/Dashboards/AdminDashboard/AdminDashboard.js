@@ -114,12 +114,24 @@ const AdminDashboard = ({ route }) => {
     setTasksLoading(true);
     setErrorMessage('');
     try {
-      const [allRes, pendingRes] = await Promise.all([
+      const [allRes, pendingRes, clientsRes] = await Promise.all([
         api.get('/tasks'),
         api.get('/tasks/pending'),
+        api.get('/users', { params: { role: 'client' } }),
       ]);
       const all = allRes.data?.success ? (allRes.data.data || []) : [];
       const pending = pendingRes.data?.success ? (pendingRes.data.data || []) : [];
+      const clients = clientsRes.data?.success ? (clientsRes.data.data || []) : [];
+
+      const clientById = new Map(
+        clients.map((c) => [String(c.id || c._id), c])
+      );
+
+      const withClientFallback = (arr) => (Array.isArray(arr) ? arr : []).map((task) => {
+        if (task?.client) return task;
+        const matched = clientById.get(String(task?.clientId || ''));
+        return matched ? { ...task, client: matched } : task;
+      });
 
       const sortByCreatedDesc = (arr) => [...arr].sort((a, b) => {
         const aDate = new Date(a.createdAt || a.date || 0).getTime();
@@ -127,8 +139,8 @@ const AdminDashboard = ({ route }) => {
         return bDate - aDate;
       });
 
-      setAllTasks(sortByCreatedDesc(all));
-      setPendingTasks(sortByCreatedDesc(pending));
+      setAllTasks(sortByCreatedDesc(withClientFallback(all)));
+      setPendingTasks(sortByCreatedDesc(withClientFallback(pending)));
     } catch (error) {
       setErrorMessage(error.response?.data?.message || 'Failed to load tasks');
       setAllTasks([]);
@@ -176,11 +188,45 @@ const AdminDashboard = ({ route }) => {
     if (activeTab === 'archives') fetchCompletedTasks();
   }, [activeTab, fetchUsers, fetchTaskTabData, fetchJobSeekers, fetchCompletedTasks, fetchCleaners]);
 
-  const openTaskDetail = (task) => {
+  const openTaskDetail = async (task) => {
     setSelectedTask(task);
     setModalSelectedCleaner(task.cleanerId ? cleanerUsers.find(c => String(c.id) === String(task.cleanerId)) || null : null);
     setShowCleanerDropdown(false);
     setShowTaskModal(true);
+
+    try {
+      const taskId = task?.id || task?._id;
+      if (!taskId) return;
+      const response = await api.get(`/tasks/${taskId}`);
+      const fullTask = response.data?.success ? response.data.data : null;
+      if (!fullTask) return;
+
+      // Preserve UI-computed recurring summary fields if present in list payload.
+      const mergedTask = {
+        ...task,
+        ...fullTask,
+        isRecurring: task?.isRecurring ?? fullTask?.isRecurring,
+        recurrenceCount: task?.recurrenceCount ?? fullTask?.recurrenceCount,
+      };
+
+      if (!mergedTask.client && mergedTask.clientId) {
+        try {
+          const clientRes = await api.get(`/users/${mergedTask.clientId}`);
+          const clientData = clientRes.data?.success ? clientRes.data.data : null;
+          if (clientData) {
+            mergedTask.client = clientData;
+          }
+        } catch (e) {
+          // Keep detail modal usable even if client lookup fails.
+        }
+      }
+
+      setSelectedTask(mergedTask);
+      setModalSelectedCleaner(mergedTask.cleanerId ? cleanerUsers.find(c => String(c.id) === String(mergedTask.cleanerId)) || null : null);
+    } catch (error) {
+      // Keep modal open with list data if detail fetch fails.
+      console.error('Failed to fetch full task details:', error);
+    }
   };
 
   const closeTaskDetail = () => {
@@ -626,6 +672,14 @@ const AdminDashboard = ({ route }) => {
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>👤 Name</Text>
                   <Text style={styles.detailValue}>{task.client?.name || '-'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>🏙 City</Text>
+                  <Text style={styles.detailValue}>{task.client?.city || '-'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>📮 Zip Code</Text>
+                  <Text style={styles.detailValue}>{task.client?.zipCode || '-'}</Text>
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>📧 Email</Text>

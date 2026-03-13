@@ -100,11 +100,7 @@ const PendingOrders = ({ navigation }) => {
   };
 
   const formatClientLocation = (client) => {
-    if (!client) return '';
-    const parts = [];
-    if (client.city) parts.push(client.city);
-    if (client.zipCode) parts.push(client.zipCode);
-    return parts.join(' • ');
+    return `${client?.city || '-'} • ${client?.zipCode || '-'}`;
   };
 
   const renderOrderCard = ({ item }) => {
@@ -151,7 +147,7 @@ const PendingOrders = ({ navigation }) => {
             <Ionicons name="person-outline" size={15} color={colors.textLight} />
             <Text style={styles.detailText}>
               {t('cleaner.client', 'Client')}: {item.client.name}
-              {formatClientLocation(item.client) ? ` • ${formatClientLocation(item.client)}` : ''}
+              {' • '}{formatClientLocation(item.client)}
             </Text>
           </View>
         ) : null}

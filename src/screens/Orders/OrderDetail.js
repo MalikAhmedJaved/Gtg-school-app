@@ -392,25 +392,20 @@ const OrderDetail = ({ route, navigation }) => {
           </Text>
         </SectionCard>
 
-        {userRole === 'cleaner' && order.client ? (
+        {(userRole === 'cleaner' || userRole === 'admin') && order.client ? (
           <SectionCard title={t('cleaner.clientInfo', 'Client Information')}>
-            {order.client.name ? (
-              <View style={styles.detailRow}>
-                <Ionicons name="person-outline" size={18} color={colors.primary} />
-                <Text style={styles.detailValue}>{order.client.name}</Text>
-              </View>
-            ) : null}
-            {order.client.city ? (
-              <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={18} color={colors.primary} />
-                <Text style={styles.detailValue}>{order.client.city}{order.client.zipCode ? `, ${order.client.zipCode}` : ''}</Text>
-              </View>
-            ) : order.client.zipCode ? (
-              <View style={styles.detailRow}>
-                <Ionicons name="location-outline" size={18} color={colors.primary} />
-                <Text style={styles.detailValue}>{order.client.zipCode}</Text>
-              </View>
-            ) : null}
+            <View style={styles.detailRow}>
+              <Ionicons name="person-outline" size={18} color={colors.primary} />
+              <Text style={styles.detailValue}>{order.client.name || '-'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Ionicons name="business-outline" size={18} color={colors.primary} />
+              <Text style={styles.detailValue}>{t('auth.city', 'City')}: {order.client.city || '-'}</Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Ionicons name="mail-outline" size={18} color={colors.primary} />
+              <Text style={styles.detailValue}>{t('auth.zipCode', 'Zip Code')}: {order.client.zipCode || '-'}</Text>
+            </View>
           </SectionCard>
         ) : null}
 

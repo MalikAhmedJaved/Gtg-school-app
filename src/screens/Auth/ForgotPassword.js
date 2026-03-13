@@ -6,6 +6,7 @@ import { colors, spacing, typography, borderRadius } from '../../constants/theme
 import Button from '../../components/Common/Button';
 import Logo from '../../components/Common/Logo';
 import api from '../../utils/api';
+import { getApiErrorMessage } from '../../utils/errorMessage';
 
 const ForgotPassword = () => {
   const { t } = useLanguage();
@@ -40,7 +41,7 @@ const ForgotPassword = () => {
         Alert.alert('Error', response.data?.message || t('auth.genericError', 'Something went wrong. Please try again.'));
       }
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || t('auth.genericError', 'Something went wrong. Please try again.'));
+      Alert.alert('Error', getApiErrorMessage(error, t('auth.genericError', 'Something went wrong. Please try again.')));
     } finally {
       setLoading(false);
     }

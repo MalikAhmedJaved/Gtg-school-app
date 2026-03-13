@@ -7,6 +7,7 @@ import Button from '../../components/Common/Button';
 import Logo from '../../components/Common/Logo';
 import { Picker } from '@react-native-picker/picker';
 import api from '../../utils/api';
+import { getApiErrorMessage } from '../../utils/errorMessage';
 
 const Register = () => {
   const { t } = useLanguage();
@@ -66,18 +67,30 @@ const Register = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name || !formData.email || !formData.password || !formData.phone || !formData.address || !formData.role) {
+    const normalizedData = {
+      ...formData,
+      name: formData.name.trim(),
+      email: formData.email.trim().toLowerCase(),
+      phone: formData.phone.trim(),
+      address: formData.address.trim(),
+      city: formData.city.trim(),
+      zipCode: formData.zipCode.trim(),
+      companyName: formData.companyName.trim(),
+      vatNumber: formData.vatNumber.trim(),
+    };
+
+    if (!normalizedData.name || !normalizedData.email || !normalizedData.password || !normalizedData.phone || !normalizedData.address || !normalizedData.role) {
       Alert.alert('Error', t('admin.fillAllFields', 'Please fill in all required fields.'));
       return;
     }
 
-    if (formData.role === 'client' && !formData.clientType) {
+    if (normalizedData.role === 'client' && !normalizedData.clientType) {
       Alert.alert('Error', t('auth.selectClientType', 'Please select a client type.'));
       return;
     }
 
-    if (formData.role === 'client' && formData.clientType === 'company') {
-      if (!formData.companyName || !formData.vatNumber) {
+    if (normalizedData.role === 'client' && normalizedData.clientType === 'company') {
+      if (!normalizedData.companyName || !normalizedData.vatNumber) {
         Alert.alert('Error', t('auth.companyRequired', 'Company name and VAT number are required for company clients.'));
         return;
       }
@@ -86,19 +99,19 @@ const Register = () => {
     setLoading(true);
     try {
       const registrationData = {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        phone: formData.phone,
-        address: formData.address,
-        city: formData.city || undefined,
-        zipCode: formData.zipCode || undefined,
-        role: formData.role,
-        ...(formData.role === 'client' && {
-          clientType: formData.clientType,
-          ...(formData.clientType === 'company' && {
-            companyName: formData.companyName,
-            vatNumber: formData.vatNumber,
+        name: normalizedData.name,
+        email: normalizedData.email,
+        password: normalizedData.password,
+        phone: normalizedData.phone,
+        address: normalizedData.address,
+        city: normalizedData.city || undefined,
+        zipCode: normalizedData.zipCode || undefined,
+        role: normalizedData.role,
+        ...(normalizedData.role === 'client' && {
+          clientType: normalizedData.clientType,
+          ...(normalizedData.clientType === 'company' && {
+            companyName: normalizedData.companyName,
+            vatNumber: normalizedData.vatNumber,
           }),
         }),
       };
@@ -111,10 +124,12 @@ const Register = () => {
         Alert.alert('Error', response.data.message || t('auth.registerError', 'Registration failed.'));
       }
     } catch (error) {
-      console.error('Registration error:', error);
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          t('auth.registerError', 'Registration failed. Please try again.');
+      console.error('Registration error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+      const errorMessage = getApiErrorMessage(error, t('auth.registerError', 'Registration failed. Please try again.'));
       Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);

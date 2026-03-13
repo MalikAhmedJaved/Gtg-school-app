@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -156,6 +156,8 @@ const NewOrder = ({ navigation, route }) => {
   const [showNativeStartTimePicker, setShowNativeStartTimePicker] = useState(false);
   const [showNativeEndTimePicker, setShowNativeEndTimePicker] = useState(false);
   const [showNativeUntilDatePicker, setShowNativeUntilDatePicker] = useState(false);
+  const mainScrollRef = useRef(null);
+  const modalScrollRef = useRef(null);
   const estimatedHours = useMemo(() => calculateHours(order), [order]);
   const calendarTitle = useMemo(() => (
     calendarDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -175,6 +177,14 @@ const NewOrder = ({ navigation, route }) => {
 
   const updateOrder = (field, value) => {
     setOrder((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const scrollToTextInput = (scrollRef) => {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        scrollRef?.current?.scrollToEnd({ animated: true });
+      }, 120);
+    });
   };
 
 
@@ -995,11 +1005,15 @@ const NewOrder = ({ navigation, route }) => {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <ScrollView
+          ref={mainScrollRef}
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         >
           {/* Header */}
           <View style={styles.header}>
@@ -1345,6 +1359,7 @@ const NewOrder = ({ navigation, route }) => {
                     placeholderTextColor={colors.gray[400]}
                     multiline
                     numberOfLines={3}
+                    onFocus={() => scrollToTextInput(mainScrollRef)}
                   />
                 </SectionCard>
               )}
@@ -1373,6 +1388,7 @@ const NewOrder = ({ navigation, route }) => {
                 placeholderTextColor={colors.gray[400]}
                 multiline
                 numberOfLines={4}
+                onFocus={() => scrollToTextInput(mainScrollRef)}
               />
               <Text style={styles.inputLabel}>{t('newOrder.hoursLabel', 'Hours needed')}</Text>
               <TextInput
@@ -1580,6 +1596,7 @@ const NewOrder = ({ navigation, route }) => {
               placeholderTextColor={colors.gray[400]}
               multiline
               numberOfLines={3}
+              onFocus={() => scrollToTextInput(mainScrollRef)}
             />
           </SectionCard>
 
@@ -1592,7 +1609,7 @@ const NewOrder = ({ navigation, route }) => {
             <KeyboardAvoidingView
               style={styles.modalKeyboardWrap}
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
               <View style={styles.modalOverlay}>
                 <View style={[styles.modalCard, { width: modalWidth }]}> 
@@ -1604,10 +1621,12 @@ const NewOrder = ({ navigation, route }) => {
                   </View>
 
                   <ScrollView
+                    ref={modalScrollRef}
                     style={styles.modalBody}
                     contentContainerStyle={styles.modalBodyContent}
                     keyboardShouldPersistTaps="handled"
                     keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                    automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
                   >
                   <Text style={styles.inputLabel}>{t('scheduling.title', 'Title')}</Text>
                   <TextInput
@@ -1913,6 +1932,7 @@ const NewOrder = ({ navigation, route }) => {
                     multiline
                     numberOfLines={3}
                     textAlignVertical="top"
+                    onFocus={() => scrollToTextInput(modalScrollRef)}
                   />
 
                   {eventError ? <Text style={styles.eventError}>{eventError}</Text> : null}
@@ -1976,7 +1996,6 @@ const NewOrder = ({ navigation, route }) => {
             />
           </View>
 
-          <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -1993,6 +2012,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: spacing.md,
+    paddingBottom: spacing.md,
   },
   header: {
     marginBottom: spacing.md,

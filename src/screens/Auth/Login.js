@@ -9,6 +9,7 @@ import Button from '../../components/Common/Button';
 import Logo from '../../components/Common/Logo';
 import api from '../../utils/api';
 import { navigate as rootNavigate } from '../../utils/rootNavigation';
+import { getApiErrorMessage } from '../../utils/errorMessage';
 
 const Login = () => {
   const { t } = useLanguage();
@@ -43,7 +44,7 @@ const Login = () => {
         setShowResendVerification(false);
       }
     } catch (error) {
-      const message = error.response?.data?.message || t('auth.resendFailed', 'Failed to resend verification email.');
+      const message = getApiErrorMessage(error, t('auth.resendFailed', 'Failed to resend verification email.'));
       Alert.alert('Error', message);
     } finally {
       setResending(false);
@@ -78,7 +79,7 @@ const Login = () => {
     } catch (error) {
       console.error('Login error:', error);
       const errorCode = error.response?.data?.code;
-      const errorMessage = error.response?.data?.message;
+      const errorMessage = getApiErrorMessage(error, '');
       const statusCode = error.response?.status;
 
       if (errorCode === 'EMAIL_NOT_VERIFIED' || statusCode === 403 || /verify|verification/i.test(errorMessage || '')) {

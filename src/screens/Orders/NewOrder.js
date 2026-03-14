@@ -158,6 +158,8 @@ const NewOrder = ({ navigation, route }) => {
   const [showNativeUntilDatePicker, setShowNativeUntilDatePicker] = useState(false);
   const mainScrollRef = useRef(null);
   const modalScrollRef = useRef(null);
+  const commentsInputRef = useRef(null);
+  const modalCommentsInputRef = useRef(null);
   const estimatedHours = useMemo(() => calculateHours(order), [order]);
   const calendarTitle = useMemo(() => (
     calendarDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -179,11 +181,24 @@ const NewOrder = ({ navigation, route }) => {
     setOrder((prev) => ({ ...prev, [field]: value }));
   };
 
-  const scrollToTextInput = (scrollRef) => {
+  const scrollToTextInput = (scrollRef, inputRef = null) => {
     requestAnimationFrame(() => {
       setTimeout(() => {
-        scrollRef?.current?.scrollToEnd({ animated: true });
-      }, 120);
+        if (inputRef?.current) {
+          inputRef.current.measureLayout(
+            scrollRef.current,
+            (x, y) => {
+              const offset = Math.max(0, y - 150);
+              scrollRef?.current?.scrollTo({ y: offset, animated: true });
+            },
+            () => {
+              scrollRef?.current?.scrollToEnd({ animated: true });
+            }
+          );
+        } else {
+          scrollRef?.current?.scrollToEnd({ animated: true });
+        }
+      }, 150);
     });
   };
 
@@ -1005,7 +1020,7 @@ const NewOrder = ({ navigation, route }) => {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 130 : 0}
       >
         <ScrollView
           ref={mainScrollRef}
@@ -1588,6 +1603,7 @@ const NewOrder = ({ navigation, route }) => {
 
             <Text style={styles.inputLabel}>{t('newOrder.additionalComments', 'Additional Comments')}</Text>
             <TextInput
+              ref={commentsInputRef}
               style={styles.textArea}
               value={isHome ? order.comments : undefined}
               onChangeText={isHome ? (val) => updateOrder('comments', val) : undefined}
@@ -1596,7 +1612,7 @@ const NewOrder = ({ navigation, route }) => {
               placeholderTextColor={colors.gray[400]}
               multiline
               numberOfLines={3}
-              onFocus={() => scrollToTextInput(mainScrollRef)}
+              onFocus={() => scrollToTextInput(mainScrollRef, commentsInputRef)}
             />
           </SectionCard>
 
@@ -1609,7 +1625,7 @@ const NewOrder = ({ navigation, route }) => {
             <KeyboardAvoidingView
               style={styles.modalKeyboardWrap}
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 130 : 0}
             >
               <View style={styles.modalOverlay}>
                 <View style={[styles.modalCard, { width: modalWidth }]}> 
@@ -1926,13 +1942,16 @@ const NewOrder = ({ navigation, route }) => {
 
                   <Text style={styles.inputLabel}>{t('client.comments', 'Comments')}</Text>
                   <TextInput
+                    ref={modalCommentsInputRef}
                     style={styles.textArea}
                     value={eventForm.comments}
                     onChangeText={(value) => updateEventForm('comments', value)}
+                    placeholder={t('newOrder.commentsPlaceholder', 'Any other notes or instructions...')}
+                    placeholderTextColor={colors.gray[400]}
                     multiline
                     numberOfLines={3}
                     textAlignVertical="top"
-                    onFocus={() => scrollToTextInput(modalScrollRef)}
+                    onFocus={() => scrollToTextInput(modalScrollRef, modalCommentsInputRef)}
                   />
 
                   {eventError ? <Text style={styles.eventError}>{eventError}</Text> : null}
@@ -2012,7 +2031,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: spacing.md,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.xl * 2,
   },
   header: {
     marginBottom: spacing.md,

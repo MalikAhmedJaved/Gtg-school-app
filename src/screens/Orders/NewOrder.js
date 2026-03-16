@@ -1389,7 +1389,7 @@ const NewOrder = ({ navigation, route }) => {
                 ? t('newOrder.commercialCleaning', 'Commercial Cleaning')
                 : t('newOrder.moveInOut', 'Move-in/Move-out')}
               collapsible
-              defaultExpanded={false}
+              defaultExpanded={true}
             >
               <Text style={styles.inputLabel}>
                 {order.serviceType === 'commercial'

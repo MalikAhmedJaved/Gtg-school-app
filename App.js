@@ -3,7 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
-import { useWindowDimensions, View, ActivityIndicator } from 'react-native';
+import { useWindowDimensions, View, ActivityIndicator, Platform } from 'react-native';
 
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -86,6 +86,7 @@ import CleanerAttention from './src/screens/Orders/CleanerAttention';
 
 // Profile Screen
 import ProfileScreen from './src/screens/Profile/ProfileScreen';
+import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
 
 import { navigationRef } from './src/utils/rootNavigation';
 import { useAuth } from './src/contexts/AuthContext';
@@ -119,6 +120,31 @@ function useUnreadCount() {
     if (!isAuthenticated) { setUnreadCount(0); return; }
     fetchUnread();
     const interval = setInterval(fetchUnread, 15000); // poll every 15s
+    return () => clearInterval(interval);
+  }, [isAuthenticated, fetchUnread]);
+
+  return unreadCount;
+}
+
+function useUnreadNotificationCount() {
+  const { isAuthenticated } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnread = useCallback(async () => {
+    try {
+      const response = await api.get('/notifications/unread-count');
+      if (response.data?.success) {
+        setUnreadCount(response.data.data.count || 0);
+      }
+    } catch {
+      // silent - notification API may not be ready while backend updates deploy
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthenticated) { setUnreadCount(0); return; }
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 15000);
     return () => clearInterval(interval);
   }, [isAuthenticated, fetchUnread]);
 
@@ -201,6 +227,7 @@ function MainTabs() {
   const { width } = useWindowDimensions();
   const compactTabBar = width < 390;
   const unreadCount = useUnreadCount();
+  const unreadNotificationCount = useUnreadNotificationCount();
   return (
     <Tab.Navigator
       screenOptions={{
@@ -257,6 +284,28 @@ function MainTabs() {
           tabBarBadgeStyle: { backgroundColor: '#00AEEF', fontSize: 10, minWidth: 18, height: 18, lineHeight: 18 },
         }}
       />
+      {Platform.OS !== 'web' ? (
+        <Tab.Screen
+          name="NotificationsTab"
+          component={NotificationsScreen}
+          options={{
+            title: 'Alerts',
+            tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={compactTabBar ? 20 : size} color={color} />,
+            tabBarBadge: unreadNotificationCount > 0 ? ' ' : undefined,
+            tabBarBadgeStyle: {
+              backgroundColor: '#e53935',
+              minWidth: 9,
+              width: 9,
+              height: 9,
+              borderRadius: 5,
+              top: 4,
+              right: -2,
+              paddingHorizontal: 0,
+              paddingVertical: 0,
+            },
+          }}
+        />
+      ) : null}
       <Tab.Screen
         name="MenuTab"
         component={MenuStack}

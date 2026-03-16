@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   TextInput,
 } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -37,6 +38,10 @@ const OrderDetail = ({ route, navigation }) => {
   const [ratingComment, setRatingComment] = useState('');
   const [loadingCleanerMeta, setLoadingCleanerMeta] = useState(false);
   const [cleanerReviews, setCleanerReviews] = useState({ averageRating: null, count: 0, reviews: [] });
+  const [cleaners, setCleaners] = useState([]);
+  const [loadingCleaners, setLoadingCleaners] = useState(false);
+  const [assigningCleaner, setAssigningCleaner] = useState(false);
+  const [selectedCleanerId, setSelectedCleanerId] = useState('');
 
   const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
   const canEditPending = userRole === 'client' && order.status === 'pending';
@@ -44,6 +49,7 @@ const OrderDetail = ({ route, navigation }) => {
   const canCleanerComplete = userRole === 'cleaner' && order.status === 'accepted';
   const canClientViewCleaner = userRole === 'client' && ['assigned', 'accepted'].includes(order.status) && Boolean(order.cleaner?.id);
   const canClientRate = userRole === 'client' && order.status === 'completed' && Boolean(order.cleaner?.id) && !order.rating && order.canRate;
+  const canAdminAssignCleaner = userRole === 'admin' && ['pending', 'assigned'].includes(order.status);
   const checklistItems = Array.isArray(order.checklist) ? order.checklist : [];
 
   useEffect(() => {
@@ -82,6 +88,43 @@ const OrderDetail = ({ route, navigation }) => {
   useEffect(() => {
     setChecklistCompleted(checklistItems.map(() => false));
   }, [order.id, order._id, checklistItems.length]);
+
+  useEffect(() => {
+    if (!canAdminAssignCleaner) return;
+
+    let mounted = true;
+    const fetchCleaners = async () => {
+      setLoadingCleaners(true);
+      try {
+        const response = await api.get('/users', { params: { role: 'cleaner' } });
+        if (!mounted) return;
+
+        const cleanerList = Array.isArray(response.data?.data)
+          ? response.data.data.filter((user) => user.role === 'cleaner' && user.isActive !== false)
+          : [];
+
+        setCleaners(cleanerList);
+
+        const currentCleanerId = order?.cleaner?.id ? String(order.cleaner.id) : '';
+        if (currentCleanerId) {
+          setSelectedCleanerId(currentCleanerId);
+        } else if (cleanerList.length > 0) {
+          setSelectedCleanerId(String(cleanerList[0].id));
+        }
+      } catch (error) {
+        if (mounted) {
+          setCleaners([]);
+        }
+      } finally {
+        if (mounted) {
+          setLoadingCleaners(false);
+        }
+      }
+    };
+
+    fetchCleaners();
+    return () => { mounted = false; };
+  }, [canAdminAssignCleaner, order?.cleaner?.id]);
 
   const getCleanerPhotoUri = () => {
     const photo = order?.cleaner?.photo;
@@ -254,6 +297,34 @@ const OrderDetail = ({ route, navigation }) => {
     }
   };
 
+  const handleAssignCleaner = async () => {
+    const taskId = order.id || order._id;
+    if (!taskId || !selectedCleanerId || assigningCleaner) return;
+
+    setAssigningCleaner(true);
+    try {
+      const response = await api.post(`/tasks/${taskId}/assign`, {
+        cleanerId: parseInt(selectedCleanerId, 10),
+      });
+
+      if (response.data?.success && response.data?.data) {
+        const updated = response.data.data;
+        setOrder((prev) => ({
+          ...prev,
+          ...updated,
+          _id: String(updated.id || updated._id || prev._id),
+        }));
+        Alert.alert('Success', response.data?.message || 'Cleaner assigned successfully');
+      } else {
+        Alert.alert('Error', response.data?.message || 'Failed to assign cleaner');
+      }
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to assign cleaner');
+    } finally {
+      setAssigningCleaner(false);
+    }
+  };
+
   const renderRatingSection = () => {
     if (userRole !== 'client' || order.status !== 'completed' || !order.cleaner?.id) return null;
 
@@ -308,6 +379,24 @@ const OrderDetail = ({ route, navigation }) => {
     );
   };
 
+  const renderCleanerFeedbackSection = () => {
+    if (userRole !== 'cleaner' || order.status !== 'completed') return null;
+    if (!order.rating) {
+      return (
+        <SectionCard title={t('cleaner.clientFeedback', 'Client Feedback')}>
+          <Text style={styles.helperText}>{t('cleaner.noFeedbackYet', 'No feedback yet for this completed order.')}</Text>
+        </SectionCard>
+      );
+    }
+
+    return (
+      <SectionCard title={t('cleaner.clientFeedback', 'Client Feedback')}>
+        <Text style={styles.valueText}>{renderStars(order.rating)} {order.rating} {t('client.outOf5', 'out of 5')}</Text>
+        {order.ratingComment ? <Text style={styles.commentText}>{order.ratingComment}</Text> : null}
+      </SectionCard>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -323,6 +412,43 @@ const OrderDetail = ({ route, navigation }) => {
           <View style={styles.actionBar}>
             <Button title="Edit Pending Order" onPress={startEdit} variant="secondary" />
           </View>
+        ) : null}
+
+        {canAdminAssignCleaner ? (
+          <SectionCard title={t('admin.assignCleaner', 'Assign Cleaner')}>
+            {loadingCleaners ? (
+              <View style={styles.loaderRow}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.loaderText}>{t('common.loading', 'Loading...')}</Text>
+              </View>
+            ) : cleaners.length === 0 ? (
+              <Text style={styles.helperText}>{t('admin.noCleanersFound', 'No cleaners available right now.')}</Text>
+            ) : (
+              <>
+                <View style={styles.pickerWrap}>
+                  <Picker
+                    selectedValue={selectedCleanerId}
+                    onValueChange={(value) => setSelectedCleanerId(String(value))}
+                  >
+                    {cleaners.map((cleaner) => (
+                      <Picker.Item
+                        key={String(cleaner.id)}
+                        label={`${cleaner.name}${cleaner.city ? ` (${cleaner.city})` : ''}`}
+                        value={String(cleaner.id)}
+                      />
+                    ))}
+                  </Picker>
+                </View>
+                <Button
+                  title={assigningCleaner ? t('common.loading', 'Loading...') : t('admin.assignCleaner', 'Assign Cleaner')}
+                  onPress={handleAssignCleaner}
+                  loading={assigningCleaner}
+                  disabled={assigningCleaner || !selectedCleanerId}
+                  variant="primary"
+                />
+              </>
+            )}
+          </SectionCard>
         ) : null}
 
         {canCleanerAccept ? (
@@ -538,6 +664,7 @@ const OrderDetail = ({ route, navigation }) => {
         ) : null}
 
         {renderRatingSection()}
+        {renderCleanerFeedbackSection()}
 
         {order.createdAt && (
           <View style={styles.metaRow}>
@@ -610,6 +737,13 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
     color: colors.textLight,
     fontSize: typography.fontSize.sm,
+  },
+  pickerWrap: {
+    borderWidth: 1,
+    borderColor: colors.gray[300],
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
+    overflow: 'hidden',
   },
   cleanerHeaderRow: {
     flexDirection: 'row',

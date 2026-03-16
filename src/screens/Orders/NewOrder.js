@@ -160,6 +160,7 @@ const NewOrder = ({ navigation, route }) => {
   const modalScrollRef = useRef(null);
   const commentsInputRef = useRef(null);
   const modalCommentsInputRef = useRef(null);
+  const commercialDescInputRef = useRef(null);
   const estimatedHours = useMemo(() => calculateHours(order), [order]);
   const calendarTitle = useMemo(() => (
     calendarDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -1396,6 +1397,7 @@ const NewOrder = ({ navigation, route }) => {
                   : t('newOrder.moveInOutDesc', 'Describe your move-in/move-out cleaning needs')}
               </Text>
               <TextInput
+                ref={commercialDescInputRef}
                 style={styles.textArea}
                 value={order.comments}
                 onChangeText={(val) => updateOrder('comments', val)}
@@ -1403,7 +1405,7 @@ const NewOrder = ({ navigation, route }) => {
                 placeholderTextColor={colors.gray[400]}
                 multiline
                 numberOfLines={4}
-                onFocus={() => scrollToTextInput(mainScrollRef)}
+                onFocus={() => scrollToTextInput(mainScrollRef, commercialDescInputRef)}
               />
               <Text style={styles.inputLabel}>{t('newOrder.hoursLabel', 'Hours needed')}</Text>
               <TextInput

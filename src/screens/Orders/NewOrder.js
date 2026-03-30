@@ -432,12 +432,16 @@ const NewOrder = ({ navigation, route }) => {
             end.setMinutes(end.getMinutes() + Math.max(30, (task.hours || 1) * 60));
           }
 
+          const cleanerName = task.cleaner?.name;
           return {
             id: `task-${task.id || task._id || `${task.date}-${task.time}`}`,
-            title: task.title || task.address || task.cleaningType || 'Event',
+            title: cleanerName
+              ? `${cleanerName} — ${task.title || task.address || task.cleaningType || 'Event'}`
+              : (task.title || task.address || task.cleaningType || 'Event'),
             start,
             end,
             color: task.status === 'pending' ? colors.warning : colors.primary,
+            resource: task,
           };
         });
       setCalendarEvents(events);
@@ -1994,6 +1998,42 @@ const NewOrder = ({ navigation, route }) => {
                       <Text style={styles.dateEventDetail}>
                         {t('scheduling.time', 'Time')}: {evt.start ? evt.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''} - {evt.end ? evt.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                       </Text>
+                      {evt.resource?.address ? (
+                        <Text style={styles.dateEventDetail}>
+                          {t('scheduling.address', 'Address')}: {evt.resource.address}
+                        </Text>
+                      ) : null}
+                      {evt.resource?.status ? (
+                        <Text style={styles.dateEventDetail}>
+                          {t('scheduling.status', 'Status')}: {evt.resource.status}
+                        </Text>
+                      ) : null}
+                      {evt.resource?.cleaningType ? (
+                        <Text style={styles.dateEventDetail}>
+                          {t('scheduling.cleaningType', 'Cleaning Type')}: {evt.resource.cleaningType}
+                        </Text>
+                      ) : null}
+                      {evt.resource?.cleaner ? (
+                        <View style={styles.dateEventCleanerSection}>
+                          <Text style={[styles.dateEventDetail, { fontWeight: '600' }]}>
+                            {t('scheduling.assignedCleaner', 'Assigned Cleaner')}: {evt.resource.cleaner.name}
+                          </Text>
+                          {evt.resource.cleaner.phone ? (
+                            <Text style={styles.dateEventDetail}>
+                              {t('common.phone', 'Phone')}: {evt.resource.cleaner.phone}
+                            </Text>
+                          ) : null}
+                          {evt.resource.cleaner.email ? (
+                            <Text style={styles.dateEventDetail}>
+                              {t('common.email', 'Email')}: {evt.resource.cleaner.email}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ) : (
+                        <Text style={[styles.dateEventDetail, { color: '#f59e0b', fontStyle: 'italic' }]}>
+                          {t('scheduling.noCleanerAssigned', 'No cleaner assigned yet')}
+                        </Text>
+                      )}
                     </View>
                   ))}
                 </ScrollView>
@@ -2436,6 +2476,12 @@ const styles = StyleSheet.create({
   dateEventDetail: {
     fontSize: typography.fontSize.sm,
     color: colors.textLight,
+  },
+  dateEventCleanerSection: {
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[200] || '#e5e7eb',
   },
   timeRow: {
     flexDirection: 'row',

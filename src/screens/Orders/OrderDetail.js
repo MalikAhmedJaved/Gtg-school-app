@@ -319,7 +319,15 @@ const OrderDetail = ({ route, navigation }) => {
         Alert.alert('Error', response.data?.message || 'Failed to assign cleaner');
       }
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to assign cleaner');
+      if (error.response?.data?.conflict) {
+        Alert.alert(
+          t('admin.schedulingConflict', 'Scheduling Conflict'),
+          error.response.data.message,
+          [{ text: t('common.ok', 'OK') }]
+        );
+      } else {
+        Alert.alert('Error', error.response?.data?.message || 'Failed to assign cleaner');
+      }
     } finally {
       setAssigningCleaner(false);
     }

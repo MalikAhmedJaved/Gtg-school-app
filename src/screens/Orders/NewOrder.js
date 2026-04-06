@@ -695,6 +695,14 @@ const NewOrder = ({ navigation, route }) => {
     }
   };
 
+  // --- Configurable section titles ---
+  const [sectionTitles, setSectionTitles] = useState({
+    serviceType: t('newOrder.serviceType', 'Service Type'),
+    cleaningCategory: t('newOrder.cleaningCategory', 'Cleaning Category'),
+    alwaysIncluded: t('newOrder.alwaysIncluded', 'Always Included'),
+    asNeeded: t('newOrder.asNeeded', 'As Needed'),
+  });
+
   // --- Service type options ---
   const [serviceTypeOptions, setServiceTypeOptions] = useState([
     { value: 'home', label: t('newOrder.homeCleaning', 'Home Cleaning') },
@@ -885,6 +893,7 @@ const NewOrder = ({ navigation, route }) => {
       const response = await api.get('/order-config');
       const data = response.data?.data;
 
+      if (data?.sectionTitles) setSectionTitles(prev => ({ ...prev, ...data.sectionTitles }));
       if (Array.isArray(data?.serviceTypeOptions) && data.serviceTypeOptions.length) {
         setServiceTypeOptions(data.serviceTypeOptions);
       }
@@ -1057,7 +1066,7 @@ const NewOrder = ({ navigation, route }) => {
 
           {/* Section A: Service Type */}
           <SectionCard
-            title={t('newOrder.serviceType', 'Service Type')}
+            title={sectionTitles.serviceType}
             collapsible
             defaultExpanded={false}
           >
@@ -1110,7 +1119,7 @@ const NewOrder = ({ navigation, route }) => {
             <>
               {/* Section B: Cleaning Category */}
               <SectionCard
-                title={t('newOrder.cleaningCategory', 'Cleaning Category')}
+                title={sectionTitles.cleaningCategory}
                 collapsible
                 defaultExpanded={false}
               >
@@ -1179,7 +1188,7 @@ const NewOrder = ({ navigation, route }) => {
                 <>
                   {/* Always included */}
                   <SectionCard
-                    title={t('newOrder.alwaysIncluded', 'Always Included')}
+                    title={sectionTitles.alwaysIncluded}
                     description={t('newOrder.alwaysIncludedDesc', 'These tasks are always performed')}
                     collapsible
                     defaultExpanded={false}
@@ -1226,7 +1235,7 @@ const NewOrder = ({ navigation, route }) => {
                   {/* As needed — only for Standard */}
                   {order.cleaningCategory === 'standard' && (
                     <SectionCard
-                      title={t('newOrder.asNeeded', 'As Needed')}
+                      title={sectionTitles.asNeeded}
                       description={t('newOrder.asNeededDesc', 'Select additional tasks you want done')}
                       collapsible
                       defaultExpanded={false}
@@ -1650,7 +1659,7 @@ const NewOrder = ({ navigation, route }) => {
                     keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
                     automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
                   >
-                  <Text style={styles.inputLabel}>{t('scheduling.title', 'Title')}</Text>
+                  <Text style={styles.inputLabel}>{t('scheduling.service', 'Service')}</Text>
                   <TextInput
                     style={styles.input}
                     value={eventForm.title}
@@ -2018,16 +2027,6 @@ const NewOrder = ({ navigation, route }) => {
                           <Text style={[styles.dateEventDetail, { fontWeight: '600' }]}>
                             {t('scheduling.assignedCleaner', 'Assigned Cleaner')}: {evt.resource.cleaner.name}
                           </Text>
-                          {evt.resource.cleaner.phone ? (
-                            <Text style={styles.dateEventDetail}>
-                              {t('common.phone', 'Phone')}: {evt.resource.cleaner.phone}
-                            </Text>
-                          ) : null}
-                          {evt.resource.cleaner.email ? (
-                            <Text style={styles.dateEventDetail}>
-                              {t('common.email', 'Email')}: {evt.resource.cleaner.email}
-                            </Text>
-                          ) : null}
                         </View>
                       ) : (
                         <Text style={[styles.dateEventDetail, { color: '#f59e0b', fontStyle: 'italic' }]}>

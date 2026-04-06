@@ -278,6 +278,29 @@ const AdminDashboard = ({ route }) => {
     }
   };
 
+  const deleteJobSeeker = (id) => {
+    Alert.alert(
+      'Delete Application',
+      'Are you sure you want to permanently delete this application?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/jobseekers/${id}`);
+              closeJobSeekerModal();
+              fetchJobSeekers();
+            } catch (error) {
+              Alert.alert('Error', error.response?.data?.message || 'Failed to delete application');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const viewJobSeekerDetails = async (seeker) => {
     setShowJobSeekerModal(true);
     setJobSeekerDetailLoading(true);
@@ -1062,6 +1085,17 @@ const AdminDashboard = ({ route }) => {
                         <Text style={styles.modalActionBtnText}>✗ Reject Application</Text>
                       </TouchableOpacity>
                     </View>
+                  </View>
+                ) : null}
+                {seeker.status === 'rejected' ? (
+                  <View style={styles.detailSection}>
+                    <Text style={styles.detailSectionTitle}>Actions</Text>
+                    <TouchableOpacity
+                      style={styles.modalRejectBtn}
+                      onPress={() => deleteJobSeeker(seeker.id)}
+                    >
+                      <Text style={styles.modalActionBtnText}>🗑 Delete Application</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : null}
 

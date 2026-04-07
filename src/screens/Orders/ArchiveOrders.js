@@ -24,10 +24,31 @@ const ArchiveOrders = ({ navigation }) => {
 
   const fetchOrders = useCallback(async () => {
     try {
-      let data = await getOrders({ status: ['completed', 'archived', 'cancelled'] });
-      
+      const [archivedData, allData] = await Promise.all([
+        getOrders({ status: ['completed', 'archived', 'cancelled'] }),
+        getOrders(),
+      ]);
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Include orders with past dates that aren't already completed/archived/cancelled
+      const pastDateOrders = (Array.isArray(allData) ? allData : []).filter((order) => {
+        if (['completed', 'archived', 'cancelled'].includes(order.status)) return false;
+        if (!order.date) return false;
+        const orderDate = new Date(order.date);
+        orderDate.setHours(0, 0, 0, 0);
+        return orderDate < today;
+      });
+
+      // Merge and deduplicate by _id
+      const merged = new Map();
+      [...(Array.isArray(archivedData) ? archivedData : []), ...pastDateOrders].forEach((order) => {
+        merged.set(order._id, order);
+      });
+
       // Sort by date descending (latest first)
-      data = (data || []).sort((a, b) => {
+      const data = Array.from(merged.values()).sort((a, b) => {
         const dateA = new Date(a.date || a.createdAt);
         const dateB = new Date(b.date || b.createdAt);
         if (dateA.getTime() !== dateB.getTime()) {
@@ -35,7 +56,7 @@ const ArchiveOrders = ({ navigation }) => {
         }
         return new Date(b.createdAt) - new Date(a.createdAt);
       });
-      
+
       setOrders(data);
     } catch (error) {
       console.error('Error fetching archived orders:', error);

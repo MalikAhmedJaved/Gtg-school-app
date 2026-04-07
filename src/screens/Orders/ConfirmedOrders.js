@@ -69,9 +69,18 @@ const ConfirmedOrders = ({ navigation }) => {
   const fetchOrders = useCallback(async () => {
     try {
       const data = await getOrders();
-      const visibleOrders = userRole === 'cleaner'
-        ? data.filter((order) => !['assigned', 'completed', 'cancelled', 'archived'].includes(order.status))
-        : data.filter((order) => !['completed', 'cancelled', 'archived'].includes(order.status));
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const visibleOrders = (Array.isArray(data) ? data : []).filter((order) => {
+        const excludedStatuses = userRole === 'cleaner'
+          ? ['assigned', 'completed', 'cancelled', 'archived']
+          : ['completed', 'cancelled', 'archived'];
+        if (excludedStatuses.includes(order.status)) return false;
+        if (!order.date) return true;
+        const orderDate = new Date(order.date);
+        orderDate.setHours(0, 0, 0, 0);
+        return orderDate >= today;
+      });
       const nextOrders = userRole === 'cleaner'
         ? sortOrdersBySchedule(visibleOrders, 'desc')
         : sortOrdersBySchedule(groupRecurringOrders(visibleOrders), 'desc');

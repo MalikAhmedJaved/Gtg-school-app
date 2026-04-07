@@ -73,9 +73,17 @@ const PendingOrders = ({ navigation }) => {
   const fetchOrders = useCallback(async () => {
     try {
       const data = await getOrders({ status: isCleaner ? 'assigned' : 'pending' });
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const upcomingOnly = (Array.isArray(data) ? data : []).filter((task) => {
+        if (!task.date) return true;
+        const taskDate = new Date(task.date);
+        taskDate.setHours(0, 0, 0, 0);
+        return taskDate >= today;
+      });
       const filteredData = isCleaner
-        ? groupRecurringClientOrders(Array.isArray(data) ? data.filter((task) => task.status === 'assigned') : [])
-        : groupRecurringClientOrders(data);
+        ? groupRecurringClientOrders(upcomingOnly.filter((task) => task.status === 'assigned'))
+        : groupRecurringClientOrders(upcomingOnly);
       setOrders(filteredData);
     } catch (error) {
       console.error('Error fetching pending orders:', error);

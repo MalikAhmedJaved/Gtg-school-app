@@ -4,6 +4,8 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  Platform,
+  StatusBar,
   TouchableOpacity,
   RefreshControl,
   SafeAreaView,
@@ -238,11 +240,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.gray[50],
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   header: {
     backgroundColor: colors.primary,
     padding: spacing.lg,
-    paddingTop: spacing.xl,
+    paddingTop: spacing.lg,
   },
   headerTitle: {
     fontSize: typography.fontSize.xxl,

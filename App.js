@@ -253,6 +253,11 @@ function MainTabs() {
           title: 'Orders',
           tabBarIcon: ({ focused, color, size }) => <Ionicons name={focused ? 'checkmark-circle' : 'checkmark-circle-outline'} size={compactTabBar ? 20 : size} color={color} />,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            navigation.navigate('OrdersTab', { screen: 'ConfirmedOrders' });
+          },
+        })}
       />
       {userRole === 'cleaner' ? (
         <Tab.Screen

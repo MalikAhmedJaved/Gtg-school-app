@@ -4,6 +4,8 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  Platform,
+  StatusBar,
   TouchableOpacity,
   RefreshControl,
   SafeAreaView,
@@ -187,7 +189,7 @@ const PendingOrders = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.gray[50] },
+  container: { flex: 1, backgroundColor: colors.gray[50], paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 },
   listContent: { padding: spacing.md, paddingBottom: spacing.xxl },
   card: {
     backgroundColor: colors.white,

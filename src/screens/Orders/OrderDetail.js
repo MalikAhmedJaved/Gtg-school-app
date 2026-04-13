@@ -92,7 +92,7 @@ const OrderDetail = ({ route, navigation }) => {
 
   // Fetch all sibling tasks in the same recurrence group
   useEffect(() => {
-    if (!order.isRecurring || !order.recurrenceGroupId) return;
+    if (!order.recurrenceGroupId) return;
     let mounted = true;
     (async () => {
       try {
@@ -617,7 +617,7 @@ const OrderDetail = ({ route, navigation }) => {
           </SectionCard>
         ) : null}
 
-        {order.isRecurring ? (
+        {(order.isRecurring || order.recurrenceGroupId) ? (
           <SectionCard title={t('orders.recurringInfo', 'Recurring Information')}>
             <View style={styles.detailRow}>
               <Ionicons name="repeat" size={18} color={colors.primary} />

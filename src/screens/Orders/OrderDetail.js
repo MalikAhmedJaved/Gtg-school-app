@@ -17,7 +17,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
-import { SERVICE_TYPES, ORDER_STATUSES, getOrderById, getCleanerReviews, completeOrder, rateOrder } from '../../utils/orderService';
+import { SERVICE_TYPES, ORDER_STATUSES, getOrderById, getOrders, getCleanerReviews, completeOrder, rateOrder } from '../../utils/orderService';
 import SectionCard from '../../components/Common/SectionCard';
 import Button from '../../components/Common/Button';
 import { formatDate, formatTimeRange } from '../../utils/formatters';
@@ -42,6 +42,7 @@ const OrderDetail = ({ route, navigation }) => {
   const [loadingCleaners, setLoadingCleaners] = useState(false);
   const [assigningCleaner, setAssigningCleaner] = useState(false);
   const [selectedCleanerId, setSelectedCleanerId] = useState('');
+  const [recurringDates, setRecurringDates] = useState([]);
 
   const statusInfo = ORDER_STATUSES[order.status] || ORDER_STATUSES.pending;
   const canEditPending = userRole === 'client' && order.status === 'pending';
@@ -88,6 +89,25 @@ const OrderDetail = ({ route, navigation }) => {
   useEffect(() => {
     setChecklistCompleted(checklistItems.map(() => false));
   }, [order.id, order._id, checklistItems.length]);
+
+  // Fetch all sibling tasks in the same recurrence group
+  useEffect(() => {
+    if (!order.isRecurring || !order.recurrenceGroupId) return;
+    let mounted = true;
+    (async () => {
+      try {
+        const allTasks = await getOrders();
+        if (!mounted) return;
+        const siblings = (Array.isArray(allTasks) ? allTasks : [])
+          .filter((t) => t.recurrenceGroupId === order.recurrenceGroupId)
+          .sort((a, b) => new Date(a.date) - new Date(b.date));
+        setRecurringDates(siblings);
+      } catch (err) {
+        console.error('Failed to fetch recurring siblings:', err);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [order.isRecurring, order.recurrenceGroupId]);
 
   useEffect(() => {
     if (!canAdminAssignCleaner) return;
@@ -619,6 +639,44 @@ const OrderDetail = ({ route, navigation }) => {
                 <Text style={styles.detailValue}>Until {order.recurrenceUntil}</Text>
               </View>
             ) : null}
+            {recurringDates.length > 0 ? (
+              <View style={styles.recurringDatesList}>
+                <Text style={styles.recurringDatesTitle}>
+                  {t('orders.upcomingDates', 'Scheduled Dates')}
+                </Text>
+                {recurringDates.map((sibling, idx) => {
+                  const isCurrent = (sibling._id || sibling.id) === (order._id || order.id);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const siblingDate = sibling.date ? new Date(sibling.date) : null;
+                  if (siblingDate) siblingDate.setHours(0, 0, 0, 0);
+                  const isPast = siblingDate && siblingDate < today;
+                  const statusLabel = ORDER_STATUSES[sibling.status]?.label || sibling.status;
+                  return (
+                    <View
+                      key={sibling._id || sibling.id || idx}
+                      style={[
+                        styles.recurringDateRow,
+                        isCurrent && styles.recurringDateRowCurrent,
+                        isPast && styles.recurringDateRowPast,
+                      ]}
+                    >
+                      <Ionicons
+                        name={sibling.status === 'completed' ? 'checkmark-circle' : isPast ? 'close-circle' : 'ellipse-outline'}
+                        size={16}
+                        color={sibling.status === 'completed' ? colors.success : isPast ? colors.gray[400] : colors.primary}
+                      />
+                      <Text style={[styles.recurringDateText, isPast && styles.recurringDateTextPast]}>
+                        {formatDate(sibling.date)}
+                      </Text>
+                      <Text style={[styles.recurringDateStatus, { color: ORDER_STATUSES[sibling.status]?.color || colors.textLight }]}>
+                        {statusLabel}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
           </SectionCard>
         ) : null}
 
@@ -921,6 +979,47 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     color: colors.text,
     fontWeight: typography.fontWeight.medium,
+  },
+  recurringDatesList: {
+    marginTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.gray[200],
+    paddingTop: spacing.sm,
+  },
+  recurringDatesTitle: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  recurringDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginBottom: 2,
+  },
+  recurringDateRowCurrent: {
+    backgroundColor: colors.primary + '15',
+  },
+  recurringDateRowPast: {
+    opacity: 0.5,
+  },
+  recurringDateText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.text,
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
+  recurringDateTextPast: {
+    textDecorationLine: 'line-through',
+    color: colors.gray[400],
+  },
+  recurringDateStatus: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    textTransform: 'uppercase',
   },
 });
 

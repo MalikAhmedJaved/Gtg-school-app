@@ -1,9 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, Text, Image } from 'react-native';
-import { colors } from '../../constants/theme';
+import { View, StyleSheet, Image } from 'react-native';
 
-// Use the provided PNG logo for the mobile app
-const logoPng = require('../../../assets/logo-Photoroom.png');
+const logoPng = require('../../../assets/gtg_logo.png');
 
 const Logo = ({ width = 150, height = 150 }) => {
   return (
@@ -21,9 +19,6 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  fallbackLogo: {
-    color: colors.primary,
   },
 });
 

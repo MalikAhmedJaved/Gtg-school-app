@@ -1,13 +1,14 @@
 {
   "expo": {
-    "name": "Cleaning Service",
-    "slug": "cleaning-service-mobile",
+    "name": "My Gtg",
+    "slug": "glory-to-god-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/gtg_logo.png",
     "userInterfaceStyle": "light",
     "splash": {
       "resizeMode": "contain",
-      "backgroundColor": "#2c7a7b"
+      "backgroundColor": "#1A5276"
     },
     "plugins": [
       [
@@ -16,23 +17,32 @@
           "photosPermission": "The app accesses your photos to let you share them."
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/disable-png-crunch"
     ],
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cleaningservice.mobile"
+      "bundleIdentifier": "com.glorytogod.ppec"
     },
     "android": {
-      "package": "com.cleaningservice.mobile"
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/gtg_logo.png",
+        "backgroundColor": "#1A5276"
+      },
+      "package": "com.glorytogod.ppec",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {},
     "extra": {
       "eas": {
-        "projectId": "f5bd8789-829f-4f61-9454-db9577f458c2"
+        "projectId": "a8ce6163-51d6-43e9-84a5-fe1a88d1e855"
       }
-    }
+    },
+    "owner": "malik1460"
   }
 }

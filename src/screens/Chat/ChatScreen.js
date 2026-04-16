@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,48 +8,46 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Modal,
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../contexts/AuthContext';
-import { colors, spacing, typography, borderRadius } from '../../constants/theme';
-import api from '../../utils/api';
+import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { MOCK_CHAT_CONVERSATIONS, MOCK_MESSAGES, THERAPISTS } from '../../utils/mockData';
 
-// ─── CONVERSATION LIST SCREEN ─────────────────────────────────
-function ConversationList({ conversations, onSelect, onNewChat, refreshing, onRefresh, userRole }) {
+// ─── CONVERSATION LIST ──────────────────────────────────────
+function ConversationList({ onSelect }) {
   const insets = useSafeAreaInsets();
 
   const renderItem = ({ item }) => {
-    const { partner, lastMessage, unreadCount } = item;
-    const initial = partner.name ? partner.name.charAt(0).toUpperCase() : '?';
-    const timeStr = lastMessage?.createdAt ? formatTime(lastMessage.createdAt) : '';
-    const preview = lastMessage ? (String(lastMessage.senderId) === String(partner.id) ? lastMessage.text : `You: ${lastMessage.text}`) : 'No messages yet';
-
+    const { therapist } = item;
     return (
-      <TouchableOpacity style={styles.conversationItem} onPress={() => onSelect(item)} activeOpacity={0.7}>
-        <View style={[styles.avatar, partner.role === 'admin' && styles.avatarAdmin, partner.role === 'cleaner' && styles.avatarCleaner]}>
-          <Text style={styles.avatarText}>{initial}</Text>
+      <TouchableOpacity
+        style={styles.conversationItem}
+        onPress={() => onSelect(item)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.avatar, { backgroundColor: therapist.color }]}>
+          <Text style={styles.avatarText}>{therapist.name.charAt(0)}</Text>
         </View>
         <View style={styles.conversationBody}>
           <View style={styles.conversationRow}>
-            <Text style={styles.conversationName} numberOfLines={1}>{partner.name}</Text>
-            <Text style={styles.conversationTime}>{timeStr}</Text>
+            <Text style={styles.conversationName}>{therapist.fullName}</Text>
+            <Text style={styles.conversationTime}>{item.lastMessageTime}</Text>
           </View>
           <View style={styles.conversationRow}>
-            <Text style={[styles.conversationPreview, unreadCount > 0 && styles.unreadText]} numberOfLines={1}>
-              {preview.length > 45 ? preview.substring(0, 45) + '...' : preview}
+            <Text
+              style={[styles.conversationPreview, item.unreadCount > 0 && styles.unreadText]}
+              numberOfLines={1}
+            >
+              {item.lastMessage}
             </Text>
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+            {item.unreadCount > 0 && (
+              <View style={[styles.badge, { backgroundColor: therapist.color }]}>
+                <Text style={styles.badgeText}>{item.unreadCount}</Text>
               </View>
             )}
           </View>
-          <Text style={styles.roleTag}>{partner.role}</Text>
+          <Text style={[styles.roleTag, { color: therapist.color }]}>{therapist.role}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -57,136 +55,81 @@ function ConversationList({ conversations, onSelect, onNewChat, refreshing, onRe
 
   return (
     <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.md) }]}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={styles.headerTitle}>Messages</Text>
-            <Text style={styles.headerSubtitle}>
-              {userRole === 'admin' ? 'Chat with clients & cleaners' : 'Chat with support'}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.newChatBtn} onPress={onNewChat} activeOpacity={0.7}>
-            <Ionicons name="add" size={22} color={colors.white} />
-          </TouchableOpacity>
-        </View>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm }]}>
+        <Text style={styles.headerTitle}>Messages</Text>
+        <Text style={styles.headerSubtitle}>Chat with your child's therapists</Text>
       </View>
 
-      {conversations.length === 0 && !refreshing ? (
-        <View style={styles.centered}>
-          <Text style={styles.placeholderIcon}>💬</Text>
-          <Text style={styles.placeholderTitle}>No conversations yet</Text>
-          <Text style={styles.placeholderText}>Tap the + button to start a new chat</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={conversations}
-          keyExtractor={(item) => String(item.partner.id)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        />
-      )}
+      <FlatList
+        data={MOCK_CHAT_CONVERSATIONS}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.centered}>
+            <Ionicons name="chatbubbles-outline" size={64} color={colors.gray[300]} />
+            <Text style={styles.emptyTitle}>No conversations yet</Text>
+            <Text style={styles.emptyText}>Messages from therapists will appear here</Text>
+          </View>
+        }
+      />
     </View>
   );
 }
 
-// ─── CHAT THREAD SCREEN ──────────────────────────────────────
-function ChatThread({ partner, currentUserId, onBack, onMessageSent }) {
+// ─── CHAT THREAD ────────────────────────────────────────────
+function ChatThread({ conversation, onBack }) {
   const insets = useSafeAreaInsets();
-  const [messages, setMessages] = useState([]);
+  const { therapist } = conversation;
+  const [messages, setMessages] = useState(MOCK_MESSAGES[therapist.id] || []);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
   const flatListRef = useRef(null);
-  const pollRef = useRef(null);
 
-  const loadMessages = useCallback(async () => {
-    try {
-      const response = await api.get(`/chat/messages/${partner.id}`);
-      if (response.data?.success) {
-        // Sort messages: oldest first (ascending)
-        const sorted = response.data.data.sort((a, b) => {
-          const dateA = new Date(a.createdAt || 0);
-          const dateB = new Date(b.createdAt || 0);
-          return dateA - dateB; // Ascending (oldest first)
-        });
-        setMessages(sorted);
-      }
-    } catch (error) {
-      console.error('Load messages error:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [partner.id]);
-
-  const markAsRead = useCallback(async () => {
-    try {
-      await api.put(`/chat/read/${partner.id}`);
-    } catch {
-      // silent
-    }
-  }, [partner.id]);
-
-  useEffect(() => {
-    loadMessages();
-    markAsRead();
-
-    // Poll for new messages every 5 seconds
-    pollRef.current = setInterval(() => {
-      loadMessages();
-      markAsRead();
-    }, 5000);
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [loadMessages, markAsRead]);
-
-  const sendMessage = async () => {
+  const sendMessage = () => {
     const text = input.trim();
-    if (!text || sending) return;
+    if (!text) return;
 
-    setSending(true);
+    const newMsg = {
+      id: Date.now(),
+      senderId: 'parent',
+      text,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isMe: true,
+    };
+
+    setMessages(prev => [...prev, newMsg]);
     setInput('');
 
-    // Optimistic update
-    const tempMsg = {
-      id: `temp-${Date.now()}`,
-      text,
-      senderId: parseInt(currentUserId),
-      receiverId: partner.id,
-      createdAt: new Date().toISOString(),
-      sender: { id: currentUserId },
-      _sending: true,
-    };
-    setMessages(prev => [...prev, tempMsg]);
-
-    try {
-      const response = await api.post('/chat/send', { receiverId: partner.id, text });
-      if (response.data?.success) {
-        setMessages(prev => prev.map(m => m.id === tempMsg.id ? response.data.data : m));
-        if (onMessageSent) onMessageSent();
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send message');
-      setMessages(prev => prev.filter(m => m.id !== tempMsg.id));
-      setInput(text);
-    } finally {
-      setSending(false);
-    }
+    // Simulate therapist reply after 2 seconds
+    setTimeout(() => {
+      const replies = [
+        `Thank you for your message! I'll get back to you shortly.`,
+        `That's a great question! Let me look into that for you.`,
+        `I appreciate you reaching out. We'll discuss this further in our next session.`,
+        `Absolutely! ${conversation.therapist.name === 'Lisa' ? 'I\'ll check on that for you.' : 'We can work on that during our next therapy session.'}`,
+      ];
+      const replyMsg = {
+        id: Date.now() + 1,
+        senderId: therapist.id,
+        text: replies[Math.floor(Math.random() * replies.length)],
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isMe: false,
+      };
+      setMessages(prev => [...prev, replyMsg]);
+    }, 2000);
   };
 
   const renderMessage = ({ item }) => {
-    const isMe = String(item.senderId) === String(currentUserId);
     return (
-      <View style={[styles.messageBubble, isMe ? styles.messageMe : styles.messageOther]}>
-        <Text style={[styles.messageText, isMe && styles.messageTextMe]}>{item.text}</Text>
-        <View style={styles.messageFooter}>
-          <Text style={[styles.messageTime, isMe && styles.messageTimeMe]}>
-            {item.createdAt ? formatTime(item.createdAt) : ''}
-          </Text>
-          {isMe && item.isRead && <Text style={styles.readIndicator}>✓✓</Text>}
-          {item._sending && <Text style={styles.sendingIndicator}>Sending...</Text>}
+      <View style={[styles.messageBubble, item.isMe ? styles.messageMe : styles.messageOther]}>
+        {!item.isMe && (
+          <View style={[styles.msgAvatar, { backgroundColor: therapist.color }]}>
+            <Text style={styles.msgAvatarText}>{therapist.name.charAt(0)}</Text>
+          </View>
+        )}
+        <View style={[styles.msgContent, item.isMe ? styles.msgContentMe : styles.msgContentOther]}>
+          <Text style={[styles.messageText, item.isMe && styles.messageTextMe]}>{item.text}</Text>
+          <Text style={[styles.messageTime, item.isMe && styles.messageTimeMe]}>{item.time}</Text>
         </View>
       </View>
     );
@@ -194,48 +137,37 @@ function ChatThread({ partner, currentUserId, onBack, onMessageSent }) {
 
   return (
     <View style={styles.threadContainer}>
-      <View style={[styles.threadHeader, { paddingTop: Math.max(insets.top, spacing.md) }]}>
+      <View style={[styles.threadHeader, { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm }]}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <View style={[styles.threadAvatar, partner.role === 'admin' && styles.avatarAdmin, partner.role === 'cleaner' && styles.avatarCleaner]}>
-          <Text style={styles.threadAvatarText}>{partner.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+        <View style={[styles.threadAvatar, { backgroundColor: therapist.color }]}>
+          <Text style={styles.threadAvatarText}>{therapist.name.charAt(0)}</Text>
         </View>
         <View style={styles.threadHeaderInfo}>
-          <Text style={styles.threadTitle} numberOfLines={1}>{partner.name}</Text>
-          <Text style={styles.threadRole}>{partner.role}</Text>
+          <Text style={styles.threadTitle}>{therapist.fullName}</Text>
+          <Text style={styles.threadRole}>{therapist.role}</Text>
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={renderMessage}
-          contentContainerStyle={[styles.messagesList, messages.length === 0 && { flex: 1, justifyContent: 'center' }]}
-          ListEmptyComponent={
-            <View style={styles.centered}>
-              <Text style={styles.placeholderIcon}>👋</Text>
-              <Text style={styles.placeholderText}>Say hello!</Text>
-            </View>
+      <FlatList
+        ref={flatListRef}
+        data={messages}
+        keyExtractor={(item) => String(item.id)}
+        renderItem={renderMessage}
+        contentContainerStyle={[styles.messagesList, messages.length === 0 && { flex: 1, justifyContent: 'center' }]}
+        ListEmptyComponent={
+          <View style={styles.centered}>
+            <Ionicons name="chatbubble-outline" size={48} color={colors.gray[300]} />
+            <Text style={styles.emptyText}>Start a conversation!</Text>
+          </View>
+        }
+        onContentSizeChange={() => {
+          if (flatListRef.current && messages.length > 0) {
+            flatListRef.current.scrollToEnd({ animated: false });
           }
-          onContentSizeChange={() => {
-            if (flatListRef.current && messages.length > 0) {
-              flatListRef.current.scrollToEnd({ animated: false });
-            }
-          }}
-          onLayout={() => {
-            if (flatListRef.current && messages.length > 0) {
-              flatListRef.current.scrollToEnd({ animated: false });
-            }
-          }}
-        />
-      )}
+        }}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -250,12 +182,11 @@ function ChatThread({ partner, currentUserId, onBack, onMessageSent }) {
             placeholderTextColor={colors.textLight}
             multiline
             maxLength={1000}
-            returnKeyType="default"
           />
           <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
+            style={[styles.sendButton, !input.trim() && styles.sendButtonDisabled]}
             onPress={sendMessage}
-            disabled={!input.trim() || sending}
+            disabled={!input.trim()}
           >
             <Ionicons name="send" size={20} color={colors.white} />
           </TouchableOpacity>
@@ -265,278 +196,43 @@ function ChatThread({ partner, currentUserId, onBack, onMessageSent }) {
   );
 }
 
-// ─── USER PICKER MODAL ───────────────────────────────────────
-function UserPickerModal({ visible, onClose, onSelect }) {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    if (visible) {
-      loadUsers();
-    }
-  }, [visible]);
-
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const response = await api.get('/chat/users');
-      if (response.data?.success) {
-        setUsers(response.data.data);
-      }
-    } catch (error) {
-      console.error('Load chat users error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filtered = users.filter(u => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (u.name || '').toLowerCase().includes(q) ||
-           (u.email || '').toLowerCase().includes(q) ||
-           (u.role || '').toLowerCase().includes(q);
-  });
-
-  const admins = filtered.filter(u => u.role === 'admin');
-  const clientsList = filtered.filter(u => u.role === 'client');
-  const cleanersList = filtered.filter(u => u.role === 'cleaner');
-
-  const renderGroup = (title, list) => {
-    if (list.length === 0) return null;
-    return (
-      <View key={title}>
-        <Text style={styles.groupTitle}>{title} ({list.length})</Text>
-        {list.map(user => (
-          <TouchableOpacity key={user.id} style={styles.userPickItem} onPress={() => { onSelect(user); onClose(); setSearch(''); }}>
-            <View style={[styles.avatar, user.role === 'admin' && styles.avatarAdmin, user.role === 'cleaner' && styles.avatarCleaner]}>
-              <Text style={styles.avatarText}>{user.name?.charAt(0)?.toUpperCase() || '?'}</Text>
-            </View>
-            <View style={styles.userPickInfo}>
-              <Text style={styles.userPickName}>{user.name}</Text>
-              <Text style={styles.userPickEmail}>{user.email}</Text>
-            </View>
-            <Text style={styles.userPickRole}>{user.role}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Chat</Text>
-            <TouchableOpacity onPress={() => { onClose(); setSearch(''); }}>
-              <Ionicons name="close" size={24} color={colors.textLight} />
-            </TouchableOpacity>
-          </View>
-
-          <TextInput
-            style={styles.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by name or email..."
-            placeholderTextColor={colors.textLight}
-          />
-
-          {loading ? (
-            <View style={[styles.centered, { paddingVertical: spacing.xl }]}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : filtered.length === 0 ? (
-            <View style={[styles.centered, { paddingVertical: spacing.xl }]}>
-              <Text style={styles.placeholderText}>No users found</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={[1]}
-              renderItem={() => (
-                <View style={styles.userPickList}>
-                  {renderGroup('Admins', admins)}
-                  {renderGroup('Clients', clientsList)}
-                  {renderGroup('Cleaners', cleanersList)}
-                </View>
-              )}
-              keyExtractor={() => 'groups'}
-              contentContainerStyle={{ paddingBottom: spacing.lg }}
-            />
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-// ─── MAIN CHAT SCREEN ────────────────────────────────────────
-export default function ChatScreen({ route }) {
-  const { isAuthenticated, userRole, userId } = useAuth();
-  const [conversations, setConversations] = useState([]);
+// ─── MAIN CHAT SCREEN ───────────────────────────────────────
+export default function ChatScreen() {
   const [selectedConversation, setSelectedConversation] = useState(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [showUserPicker, setShowUserPicker] = useState(false);
-  const pollRef = useRef(null);
-  const insets = useSafeAreaInsets();
-
-  const loadConversations = useCallback(async () => {
-    try {
-      const response = await api.get('/chat/conversations');
-      if (response.data?.success) {
-        // Sort conversations: latest message first
-        const sorted = response.data.data.sort((a, b) => {
-          const dateA = new Date(a.lastMessage?.createdAt || 0);
-          const dateB = new Date(b.lastMessage?.createdAt || 0);
-          return dateB - dateA; // Descending (latest first)
-        });
-        setConversations(sorted);
-      }
-    } catch (error) {
-      console.error('Load conversations error:', error);
-    }
-  }, []);
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await loadConversations();
-    setRefreshing(false);
-  }, [loadConversations]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadConversations();
-      pollRef.current = setInterval(loadConversations, 10000);
-      return () => {
-        if (pollRef.current) clearInterval(pollRef.current);
-      };
-    }
-  }, [isAuthenticated, loadConversations]);
-
-  const handleSelectConversation = (conv) => {
-    setSelectedConversation(conv.partner);
-  };
-
-  const handleStartNewChat = (user) => {
-    setSelectedConversation(user);
-  };
-
-  const handleBack = () => {
-    setSelectedConversation(null);
-    loadConversations();
-  };
-
-  useEffect(() => {
-    const starter = route?.params?.startWithUser;
-    if (!starter || !starter.id) return;
-
-    setSelectedConversation(starter);
-  }, [route?.params?.startWithUser]);
-
-  if (!isAuthenticated) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.centered}>
-          <Text style={styles.placeholderIcon}>💬</Text>
-          <Text style={styles.placeholderTitle}>Messages</Text>
-          <Text style={styles.placeholderText}>Log in to chat.</Text>
-        </View>
-      </View>
-    );
-  }
 
   if (selectedConversation) {
     return (
       <ChatThread
-        partner={selectedConversation}
-        currentUserId={userId}
-        onBack={handleBack}
-        onMessageSent={loadConversations}
+        conversation={selectedConversation}
+        onBack={() => setSelectedConversation(null)}
       />
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <ConversationList
-        conversations={conversations}
-        onSelect={handleSelectConversation}
-        onNewChat={() => setShowUserPicker(true)}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        userRole={userRole}
-      />
-      <UserPickerModal
-        visible={showUserPicker}
-        onClose={() => setShowUserPicker(false)}
-        onSelect={handleStartNewChat}
-      />
-    </View>
-  );
+  return <ConversationList onSelect={setSelectedConversation} />;
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────
-function formatTime(dateStr) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } else if (diffDays === 1) {
-    return 'Yesterday';
-  } else if (diffDays < 7) {
-    return date.toLocaleDateString([], { weekday: 'short' });
-  } else {
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-  }
-}
-
-// ─── STYLES ──────────────────────────────────────────────────
+// ─── STYLES ─────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.backgroundLight,
+    backgroundColor: colors.background,
   },
-  // ── Header ──
   header: {
-    padding: spacing.lg,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
   },
   headerTitle: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
+    color: colors.white,
   },
   headerSubtitle: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
+    color: 'rgba(255,255,255,0.7)',
     marginTop: spacing.xs,
   },
-  newChatBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  // ── Conversation List ──
   listContent: {
     padding: spacing.md,
   },
@@ -545,28 +241,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.white,
     padding: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     marginBottom: spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
+    ...shadows.sm,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
-  },
-  avatarAdmin: {
-    backgroundColor: colors.warning,
-  },
-  avatarCleaner: {
-    backgroundColor: colors.secondary,
   },
   avatarText: {
     fontSize: typography.fontSize.xl,
@@ -584,7 +269,7 @@ const styles = StyleSheet.create({
   },
   conversationName: {
     fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
+    fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
     flex: 1,
     marginRight: spacing.sm,
@@ -604,16 +289,14 @@ const styles = StyleSheet.create({
     color: colors.textDark,
   },
   roleTag: {
-    fontSize: 10,
-    color: colors.textLight,
-    textTransform: 'capitalize',
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.medium,
     marginTop: 2,
   },
   badge: {
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
@@ -623,7 +306,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
     color: colors.white,
   },
-  // ── Chat Thread ──
+  // ── Thread ──
   threadContainer: {
     flex: 1,
     backgroundColor: colors.backgroundLight,
@@ -631,20 +314,18 @@ const styles = StyleSheet.create({
   threadHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.primary,
   },
   backButton: {
-    marginRight: spacing.sm,
-    padding: spacing.xs,
+    padding: spacing.sm,
+    marginRight: spacing.xs,
   },
   threadAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.primary,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
@@ -660,37 +341,54 @@ const styles = StyleSheet.create({
   threadTitle: {
     fontSize: typography.fontSize.lg,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
+    color: colors.white,
   },
   threadRole: {
     fontSize: typography.fontSize.xs,
-    color: colors.textLight,
-    textTransform: 'capitalize',
+    color: 'rgba(255,255,255,0.7)',
   },
   messagesList: {
     padding: spacing.md,
     flexGrow: 1,
   },
   messageBubble: {
-    maxWidth: '80%',
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    marginBottom: spacing.md,
+    maxWidth: '85%',
   },
   messageMe: {
     alignSelf: 'flex-end',
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
+    flexDirection: 'row-reverse',
   },
   messageOther: {
     alignSelf: 'flex-start',
+  },
+  msgAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+    marginTop: 4,
+  },
+  msgAvatarText: {
+    fontSize: 12,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.white,
+  },
+  msgContent: {
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+  },
+  msgContentMe: {
+    backgroundColor: colors.primary,
+    borderBottomRightRadius: 4,
+  },
+  msgContentOther: {
     backgroundColor: colors.white,
     borderBottomLeftRadius: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 2,
-    elevation: 1,
+    ...shadows.sm,
   },
   messageText: {
     fontSize: typography.fontSize.md,
@@ -700,27 +398,14 @@ const styles = StyleSheet.create({
   messageTextMe: {
     color: colors.white,
   },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 4,
-  },
   messageTime: {
     fontSize: 10,
     color: colors.textLight,
+    marginTop: 4,
+    alignSelf: 'flex-end',
   },
   messageTimeMe: {
     color: 'rgba(255,255,255,0.7)',
-  },
-  readIndicator: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  sendingIndicator: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.5)',
-    fontStyle: 'italic',
   },
   // ── Input ──
   inputRow: {
@@ -756,229 +441,6 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: colors.gray[300],
-  },
-  // ── User Picker Modal ──
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: borderRadius.lg,
-    borderTopRightRadius: borderRadius.lg,
-    maxHeight: '80%',
-    minHeight: '50%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
-  },
-  modalTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-  },
-  searchInput: {
-    margin: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: typography.fontSize.md,
-    color: colors.textDark,
-    backgroundColor: colors.backgroundLight,
-  },
-  userPickList: {
-    paddingHorizontal: spacing.md,
-  },
-  groupTitle: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-  },
-  userPickItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.sm,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
-  },
-  userPickInfo: {
-    flex: 1,
-  },
-  userPickName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textDark,
-  },
-  userPickEmail: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textLight,
-    marginTop: 2,
-  },
-  userPickRole: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textLight,
-    textTransform: 'capitalize',
-    backgroundColor: colors.gray[100],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-    overflow: 'hidden',
-  },
-  // ── Common ──
-  messageTextMe: {
-    color: colors.white,
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-    gap: 4,
-  },
-  messageTime: {
-    fontSize: 10,
-    color: colors.textLight,
-  },
-  messageTimeMe: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  readIndicator: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  sendingIndicator: {
-    fontSize: 10,
-    color: 'rgba(255,255,255,0.5)',
-    fontStyle: 'italic',
-  },
-  // ── Input ──
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[200],
-  },
-  chatInput: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-    borderRadius: 20,
-    paddingHorizontal: spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? spacing.sm : spacing.xs,
-    fontSize: typography.fontSize.md,
-    color: colors.textDark,
-    backgroundColor: colors.backgroundLight,
-    marginRight: spacing.sm,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.gray[300],
-  },
-  // ── User Picker Modal ──
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: borderRadius.lg,
-    borderTopRightRadius: borderRadius.lg,
-    maxHeight: '80%',
-    minHeight: '50%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[200],
-  },
-  modalTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-  },
-  searchInput: {
-    margin: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: typography.fontSize.md,
-    color: colors.textDark,
-    backgroundColor: colors.backgroundLight,
-  },
-  userPickList: {
-    paddingHorizontal: spacing.md,
-  },
-  groupTitle: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.primary,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-    textTransform: 'uppercase',
-  },
-  userPickItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.sm,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
-  },
-  userPickInfo: {
-    flex: 1,
-  },
-  userPickName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textDark,
-  },
-  userPickEmail: {
-    fontSize: typography.fontSize.sm,
-    color: colors.textLight,
-    marginTop: 2,
-  },
-  userPickRole: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textLight,
-    textTransform: 'capitalize',
-    backgroundColor: colors.gray[100],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-    overflow: 'hidden',
   },
   // ── Common ──
   centered: {
@@ -987,19 +449,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
   },
-  placeholderIcon: {
-    fontSize: 48,
-    marginBottom: spacing.md,
-  },
-  placeholderTitle: {
+  emptyTitle: {
     fontSize: typography.fontSize.xl,
     fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.sm,
+    color: colors.gray[500],
+    marginTop: spacing.md,
   },
-  placeholderText: {
+  emptyText: {
     fontSize: typography.fontSize.md,
     color: colors.textLight,
     textAlign: 'center',
+    marginTop: spacing.sm,
   },
 });

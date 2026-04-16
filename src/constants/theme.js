@@ -1,18 +1,25 @@
-// Theme colors matching the RENT+ logo
-// Primary: Bright blue (#00AEEF)
-// Secondary: Fresh green (#7AC943)
+// Theme colors for Glory to God PPEC app
+// Primary: Deep blue (#1A5276) - trust & professionalism
+// Secondary: Warm gold (#F1C40F) - warmth & care
 
 export const colors = {
-  // Primary colors (Blue from logo text/drop)
-  primary: '#00AEEF',
-  primaryDark: '#0081B3',
-  primaryLight: '#4FD3FF',
-  
-  // Secondary colors (Green from logo ring)
-  secondary: '#7AC943',
-  secondaryDark: '#5E9D33',
-  secondaryLight: '#A5E67A',
-  
+  // Primary colors (Deep blue)
+  primary: '#1A5276',
+  primaryDark: '#0E3A5C',
+  primaryLight: '#2E86C1',
+
+  // Secondary colors (Warm gold)
+  secondary: '#F1C40F',
+  secondaryDark: '#D4AC0D',
+  secondaryLight: '#F9E154',
+
+  // Accent colors for therapy categories
+  physicalTherapy: '#E74C3C',
+  speechTherapy: '#8E44AD',
+  occupationalTherapy: '#E67E22',
+  behavioralTherapy: '#27AE60',
+  nursing: '#2980B9',
+
   // Neutral colors
   white: '#ffffff',
   black: '#000000',
@@ -28,22 +35,22 @@ export const colors = {
     800: '#1a202c',
     900: '#171923',
   },
-  
+
   // Status colors
-  success: '#38a169',
-  error: '#dc3545',
-  warning: '#ed8936',
-  info: '#2c7a7b',
-  
+  success: '#27AE60',
+  error: '#E74C3C',
+  warning: '#F39C12',
+  info: '#2980B9',
+
   // Background colors
-  background: '#ffffff',
-  backgroundLight: '#F4FBFF',
-  backgroundDark: '#E6F7FF',
-  
+  background: '#F0F4F8',
+  backgroundLight: '#F7F9FC',
+  backgroundDark: '#E8EEF4',
+
   // Text colors
-  text: '#233142',
-  textLight: '#6C7A89',
-  textDark: '#111827',
+  text: '#2C3E50',
+  textLight: '#7F8C8D',
+  textDark: '#1A252F',
 };
 
 export const spacing = {
@@ -79,9 +86,10 @@ export const typography = {
 
 export const borderRadius = {
   sm: 4,
-  md: 6,
-  lg: 8,
-  xl: 12,
+  md: 8,
+  lg: 12,
+  xl: 16,
+  xxl: 24,
   full: 9999,
 };
 

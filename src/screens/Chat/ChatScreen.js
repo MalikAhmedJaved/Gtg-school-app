@@ -380,6 +380,7 @@ const styles = StyleSheet.create({
   msgContent: {
     padding: spacing.md,
     borderRadius: borderRadius.lg,
+    flexShrink: 1,
   },
   msgContentMe: {
     backgroundColor: colors.primary,

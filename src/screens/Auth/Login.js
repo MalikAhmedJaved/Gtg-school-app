@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ImageBackground, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, StatusBar, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Image, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, StatusBar, useWindowDimensions } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../../components/Common/Button';
 
-const bgImage = require('../../../assets/background.jpeg');
+const bgImage = require('../../../assets/background.png');
+
+// Background image natural aspect ratio (1080x1920 = 9:16)
+const IMG_ASPECT = 1080 / 1920;
 
 const Login = () => {
   const { login } = useAuth();
+  const { width: screenW, height: screenH } = useWindowDimensions();
   const [formData, setFormData] = useState({
     email: 'parent@glorytogod.com',
     password: 'parent123',
@@ -37,9 +41,20 @@ const Login = () => {
     }
   };
 
+  // Scale image to cover the full screen, anchored top-left
+  const coverW = Math.max(screenW, screenH * IMG_ASPECT);
+  const coverH = Math.max(screenH, screenW / IMG_ASPECT);
+  // Shift 15% toward center so bottom text stays centered while logo isn't cut
+  const offsetX = -(coverW - screenW) * 0.15;
+
   return (
-    <ImageBackground source={bgImage} style={styles.wrapper} imageStyle={styles.bgImage} resizeMode="cover">
+    <View style={styles.wrapper}>
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
+      <Image
+        source={bgImage}
+        style={{ position: 'absolute', top: 0, left: offsetX, width: coverW, height: coverH }}
+        resizeMode="stretch"
+      />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -89,23 +104,15 @@ const Login = () => {
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-    </ImageBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   wrapper: {
     flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  bgImage: {
-    width: '100%',
-    height: '100%',
-    ...Platform.select({
-      web: { objectPosition: 'left top', objectFit: 'cover' },
-      default: {},
-    }),
+    backgroundColor: '#d4eaf7',
+    overflow: 'hidden',
   },
   flex: {
     flex: 1,

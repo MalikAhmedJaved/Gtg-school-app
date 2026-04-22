@@ -226,17 +226,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: spacing.xl,
-    paddingTop: Platform.OS === 'android' ? spacing.xl + 20 : spacing.xl,
-    paddingBottom: spacing.xl,
+    paddingTop: Platform.OS === 'android' ? spacing.sm + 20 : spacing.xs,
+    paddingBottom: spacing.md,
   },
   logoWrap: {
     alignItems: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    marginTop: 0,
+    marginBottom: spacing.xs,
   },
   logo: {
-    width: 110,
-    height: 110,
+    width: 150,
+    height: 150,
   },
   formContainer: {
     gap: spacing.sm,
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   subheading: {
     fontSize: typography.fontSize.sm,
     color: colors.gray[600],
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     textAlign: 'center',
   },
   roleRow: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
   },
   signInMuted: {
     color: colors.gray[600],
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeight.bold,
   },
   bottomSpacer: {
-    height: 40,
+    height: spacing.md,
   },
 });
 

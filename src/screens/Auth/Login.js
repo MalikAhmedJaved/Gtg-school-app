@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Image, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, StatusBar, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Image, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, TouchableOpacity, Keyboard, StatusBar, useWindowDimensions } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../../components/Common/Button';
@@ -9,7 +9,7 @@ const bgImage = require('../../../assets/background.png');
 // Background image natural aspect ratio (1080x1920 = 9:16)
 const IMG_ASPECT = 1080 / 1920;
 
-const Login = () => {
+const Login = ({ navigation }) => {
   const { login } = useAuth();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [formData, setFormData] = useState({
@@ -99,6 +99,15 @@ const Login = () => {
               />
 
               {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
+
+              <TouchableOpacity
+                style={styles.signUpRow}
+                onPress={() => navigation.navigate('Register')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.signUpMuted}>Don't have an account? </Text>
+                <Text style={styles.signUpLink}>Sign up</Text>
+              </TouchableOpacity>
             </View>
             <View style={styles.bottomSpacer} />
           </View>
@@ -161,6 +170,23 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.8)',
     padding: spacing.sm,
     borderRadius: borderRadius.md,
+  },
+  signUpRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  signUpMuted: {
+    color: colors.textDark,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.medium,
+  },
+  signUpLink: {
+    color: colors.primary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
   },
 });
 

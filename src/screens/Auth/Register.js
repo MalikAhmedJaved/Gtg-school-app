@@ -1,470 +1,287 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert, SafeAreaView, KeyboardAvoidingView, Platform, Modal, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useLanguage } from '../../contexts/LanguageContext';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  TouchableOpacity,
+  Keyboard,
+  StatusBar,
+  ScrollView,
+  Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '../../constants/theme';
 import Button from '../../components/Common/Button';
-import Logo from '../../components/Common/Logo';
-import { Picker } from '@react-native-picker/picker';
-import api from '../../utils/api';
-import { getApiErrorMessage } from '../../utils/errorMessage';
 
-const Register = () => {
-  const { t } = useLanguage();
-  const navigation = useNavigation();
+const logoImage = require('../../../assets/gtg_logo.png');
+
+const ROLES = [
+  { key: 'parent', label: 'Parent', icon: 'people-outline' },
+  { key: 'employee', label: 'Employee', icon: 'briefcase-outline' },
+];
+
+const Register = ({ navigation }) => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    password: '',
     phone: '',
-    address: '',
-    city: '',
-    zipCode: '',
-    role: '',
-    clientType: '',
-    companyName: '',
-    vatNumber: '',
+    password: '',
+    confirmPassword: '',
+    role: 'parent',
   });
   const [loading, setLoading] = useState(false);
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
-  const [showRoleModal, setShowRoleModal] = useState(false);
-  const [showClientTypeModal, setShowClientTypeModal] = useState(false);
-
-  const roleOptions = [
-    { label: t('auth.selectRole', 'Select role'), value: '' },
-    { label: t('auth.client', 'Client'), value: 'client' },
-    { label: t('auth.cleaner', 'Cleaner'), value: 'cleaner' },
-  ];
-
-  const clientTypeOptions = [
-    { label: t('auth.selectClientType', 'Select client type'), value: '' },
-    { label: t('auth.private', 'Private'), value: 'private' },
-    { label: t('auth.company', 'Company'), value: 'company' },
-  ];
-
-  const getOptionLabel = (options, value, placeholder) => {
-    return options.find((opt) => opt.value === value)?.label || placeholder;
-  };
+  const [error, setError] = useState('');
 
   const handleChange = (field, value) => {
-    setFormData((prev) => {
-      const next = { ...prev, [field]: value };
+    if (error) setError('');
+    setFormData({ ...formData, [field]: value });
+  };
 
-      // Keep dependent fields consistent with the current role and client type.
-      if (field === 'role' && value !== 'client') {
-        next.clientType = '';
-        next.companyName = '';
-        next.vatNumber = '';
-      }
-
-      if (field === 'clientType' && value !== 'company') {
-        next.companyName = '';
-        next.vatNumber = '';
-      }
-
-      return next;
-    });
+  const validate = () => {
+    const { name, email, password, confirmPassword } = formData;
+    if (!name.trim()) return 'Please enter your full name.';
+    if (!email.trim()) return 'Please enter your email.';
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return 'Please enter a valid email.';
+    if (!password || password.length < 6) return 'Password must be at least 6 characters.';
+    if (password !== confirmPassword) return 'Passwords do not match.';
+    return '';
   };
 
   const handleSubmit = async () => {
-    const normalizedData = {
-      ...formData,
-      name: formData.name.trim(),
-      email: formData.email.trim().toLowerCase(),
-      phone: formData.phone.trim(),
-      address: formData.address.trim(),
-      city: formData.city.trim(),
-      zipCode: formData.zipCode.trim(),
-      companyName: formData.companyName.trim(),
-      vatNumber: formData.vatNumber.trim(),
-    };
-
-    if (!normalizedData.name || !normalizedData.email || !normalizedData.password || !normalizedData.phone || !normalizedData.address || !normalizedData.role) {
-      Alert.alert('Error', t('admin.fillAllFields', 'Please fill in all required fields.'));
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
-    }
-
-    if (normalizedData.role === 'client' && !normalizedData.clientType) {
-      Alert.alert('Error', t('auth.selectClientType', 'Please select a client type.'));
-      return;
-    }
-
-    if (normalizedData.role === 'client' && normalizedData.clientType === 'company') {
-      if (!normalizedData.companyName || !normalizedData.vatNumber) {
-        Alert.alert('Error', t('auth.companyRequired', 'Company name and VAT number are required for company clients.'));
-        return;
-      }
     }
 
     setLoading(true);
     try {
-      const registrationData = {
-        name: normalizedData.name,
-        email: normalizedData.email,
-        password: normalizedData.password,
-        phone: normalizedData.phone,
-        address: normalizedData.address,
-        city: normalizedData.city || undefined,
-        zipCode: normalizedData.zipCode || undefined,
-        role: normalizedData.role,
-        ...(normalizedData.role === 'client' && {
-          clientType: normalizedData.clientType,
-          ...(normalizedData.clientType === 'company' && {
-            companyName: normalizedData.companyName,
-            vatNumber: normalizedData.vatNumber,
-          }),
-        }),
-      };
-
-      const response = await api.post('/auth/register', registrationData);
-
-      if (response.data.success) {
-        setRegistrationSuccess(true);
-      } else {
-        Alert.alert('Error', response.data.message || t('auth.registerError', 'Registration failed.'));
-      }
-    } catch (error) {
-      console.error('Registration error:', {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
-      const errorMessage = getApiErrorMessage(error, t('auth.registerError', 'Registration failed. Please try again.'));
-      Alert.alert('Error', errorMessage);
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      Alert.alert(
+        'Account created',
+        `Your ${formData.role === 'parent' ? 'parent' : 'employee'} account has been registered. Please sign in to continue.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Login'),
+          },
+        ]
+      );
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (registrationSuccess) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.contentContainer}
-        >
-          <View style={styles.logoContainer}>
-            <Logo width={100} height={100} />
-          </View>
-          <View style={styles.successContainer}>
-            <Text style={styles.successIcon}>✉️</Text>
-            <Text style={styles.successTitle}>
-              {t('auth.registrationSuccessTitle', 'Registration Successful!')}
-            </Text>
-            <Text style={styles.successMessage}>
-              {t(
-                'auth.verifyEmailSent',
-                'We have sent a verification email to your inbox. Please check your email and click the verification link before logging in.'
-              )}
-            </Text>
-            <Text style={styles.successEmail}>{formData.email}</Text>
-            <Button
-              title={t('auth.goToLogin', 'Go to Login')}
-              onPress={() => navigation.navigate('Login')}
-              variant="primary"
-              style={styles.goToLoginButton}
-            />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.wrapper}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
       <KeyboardAvoidingView
-        style={styles.keyboardContainer}
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.contentContainer}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator
-          scrollEnabled
-          nestedScrollEnabled
-        >
-          <View style={styles.logoContainer}>
-            <Logo width={100} height={100} />
-          </View>
-
-          <View style={styles.formContainer}>
-            <Text style={styles.title}>{t('auth.register', 'Register')}</Text>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('auth.fullName', 'Full Name')} *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.name}
-            onChangeText={(value) => handleChange('name', value)}
-            placeholder={t('auth.fullName', 'Full Name')}
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('auth.email', 'Email')} *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.email}
-            onChangeText={(value) => handleChange('email', value)}
-            placeholder={t('auth.email', 'Email')}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('auth.password', 'Password')} *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.password}
-            onChangeText={(value) => handleChange('password', value)}
-            placeholder={t('auth.password', 'Password')}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('auth.phone', 'Phone')} *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.phone}
-            onChangeText={(value) => handleChange('phone', value)}
-            placeholder={t('auth.phone', 'Phone')}
-            keyboardType="phone-pad"
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('auth.address', 'Address')} *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.address}
-            onChangeText={(value) => handleChange('address', value)}
-            placeholder={t('auth.address', 'Address')}
-          />
-        </View>
-
-        <View style={styles.row}>
-          <View style={[styles.inputGroup, styles.halfWidth]}>
-            <Text style={styles.label}>{t('auth.city', 'City')}</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.city}
-              onChangeText={(value) => handleChange('city', value)}
-              placeholder={t('auth.city', 'City')}
-            />
-          </View>
-          <View style={[styles.inputGroup, styles.halfWidth]}>
-            <Text style={styles.label}>{t('auth.zipCode', 'Zip Code')}</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.zipCode}
-              onChangeText={(value) => handleChange('zipCode', value)}
-              placeholder={t('auth.zipCode', 'Zip Code')}
-            />
-          </View>
-        </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t('auth.registerAs', 'Register as')} *</Text>
-              {Platform.OS === 'ios' ? (
-                <TouchableOpacity style={styles.iosSelector} onPress={() => setShowRoleModal(true)}>
-                  <Text style={styles.iosSelectorText}>
-                    {getOptionLabel(roleOptions, formData.role, t('auth.selectRole', 'Select role'))}
-                  </Text>
-                  <Text style={styles.iosSelectorArrow}>⌄</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={formData.role}
-                    onValueChange={(value) => handleChange('role', value)}
-                    style={styles.picker}
-                    dropdownIconColor={colors.textDark}
-                    prompt={t('auth.registerAs', 'Register as')}
-                    mode="dropdown"
-                  >
-                    <Picker.Item label={t('auth.selectRole', 'Select role')} value="" />
-                    <Picker.Item label={t('auth.client', 'Client')} value="client" />
-                    <Picker.Item label={t('auth.cleaner', 'Cleaner')} value="cleaner" />
-                  </Picker>
-                </View>
-              )}
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.logoWrap}>
+              <Image source={logoImage} style={styles.logo} resizeMode="contain" />
             </View>
 
-            {formData.role === 'client' && (
-              <>
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>{t('auth.clientType', 'Client Type')} *</Text>
-                  {Platform.OS === 'ios' ? (
-                    <TouchableOpacity style={styles.iosSelector} onPress={() => setShowClientTypeModal(true)}>
-                      <Text style={styles.iosSelectorText}>
-                        {getOptionLabel(clientTypeOptions, formData.clientType, t('auth.selectClientType', 'Select client type'))}
+            <View style={styles.formContainer}>
+              <Text style={styles.heading}>Create account</Text>
+              <Text style={styles.subheading}>Register to get started</Text>
+
+              <View style={styles.roleRow}>
+                {ROLES.map((role) => {
+                  const active = formData.role === role.key;
+                  return (
+                    <TouchableOpacity
+                      key={role.key}
+                      style={[styles.roleChip, active && styles.roleChipActive]}
+                      onPress={() => handleChange('role', role.key)}
+                      activeOpacity={0.85}
+                    >
+                      <Ionicons
+                        name={role.icon}
+                        size={18}
+                        color={active ? colors.white : colors.primary}
+                      />
+                      <Text style={[styles.roleChipText, active && styles.roleChipTextActive]}>
+                        {role.label}
                       </Text>
-                      <Text style={styles.iosSelectorArrow}>⌄</Text>
                     </TouchableOpacity>
-                  ) : (
-                    <View style={styles.pickerContainer}>
-                      <Picker
-                        selectedValue={formData.clientType}
-                        onValueChange={(value) => handleChange('clientType', value)}
-                        style={styles.picker}
-                        dropdownIconColor={colors.textDark}
-                        prompt={t('auth.clientType', 'Client Type')}
-                        mode="dropdown"
-                      >
-                        <Picker.Item label={t('auth.selectClientType', 'Select client type')} value="" />
-                        <Picker.Item label={t('auth.private', 'Private')} value="private" />
-                        <Picker.Item label={t('auth.company', 'Company')} value="company" />
-                      </Picker>
-                    </View>
-                  )}
-                </View>
+                  );
+                })}
+              </View>
 
-                {formData.clientType === 'company' && (
-                  <>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>{t('auth.companyName', 'Company Name')} *</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={formData.companyName}
-                        onChangeText={(value) => handleChange('companyName', value)}
-                        placeholder={t('auth.companyName', 'Company Name')}
-                      />
-                    </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Full Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.name}
+                  onChangeText={(v) => handleChange('name', v)}
+                  placeholder="Enter your full name"
+                  placeholderTextColor={colors.gray[400]}
+                  autoCapitalize="words"
+                />
+              </View>
 
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.label}>{t('auth.vatNumber', 'VAT Number')} *</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={formData.vatNumber}
-                        onChangeText={(value) => handleChange('vatNumber', value)}
-                        placeholder={t('auth.vatNumber', 'VAT Number')}
-                      />
-                    </View>
-                  </>
-                )}
-              </>
-            )}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.email}
+                  onChangeText={(v) => handleChange('email', v)}
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.gray[400]}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
 
-            <Button
-              title={loading ? t('common.loading', 'Loading...') : t('auth.register', 'Register')}
-              onPress={handleSubmit}
-              loading={loading}
-              variant="primary"
-              style={styles.submitButton}
-            />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Phone (optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.phone}
+                  onChangeText={(v) => handleChange('phone', v)}
+                  placeholder="+1 555 000 0000"
+                  placeholderTextColor={colors.gray[400]}
+                  keyboardType="phone-pad"
+                />
+              </View>
 
-            <View style={styles.loginLink}>
-              <Text style={styles.loginText}>
-                {t('auth.alreadyHaveAccount', 'Already have an account?')}{' '}
-              </Text>
-              <Text
-                style={styles.loginLinkText}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.password}
+                  onChangeText={(v) => handleChange('password', v)}
+                  placeholder="At least 6 characters"
+                  placeholderTextColor={colors.gray[400]}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Confirm Password</Text>
+                <TextInput
+                  style={styles.input}
+                  value={formData.confirmPassword}
+                  onChangeText={(v) => handleChange('confirmPassword', v)}
+                  placeholder="Re-enter your password"
+                  placeholderTextColor={colors.gray[400]}
+                  secureTextEntry
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <Button
+                title={loading ? 'Creating account...' : 'Register'}
+                onPress={handleSubmit}
+                loading={loading}
+                variant="primary"
+                style={styles.submitButton}
+              />
+
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+              <TouchableOpacity
+                style={styles.signInRow}
                 onPress={() => navigation.navigate('Login')}
+                activeOpacity={0.7}
               >
-                {t('auth.login', 'Login')}
-              </Text>
+                <Text style={styles.signInMuted}>Already have an account? </Text>
+                <Text style={styles.signInLink}>Sign in</Text>
+              </TouchableOpacity>
             </View>
-          </View>
 
-          <Modal visible={showRoleModal} transparent animationType="fade" onRequestClose={() => setShowRoleModal(false)}>
-            <View style={styles.modalBackdrop}>
-              <View style={styles.modalCard}>
-                <Text style={styles.modalTitle}>{t('auth.registerAs', 'Register as')}</Text>
-                {roleOptions.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value || 'empty-role'}
-                    style={styles.modalOption}
-                    onPress={() => {
-                      handleChange('role', opt.value);
-                      setShowRoleModal(false);
-                    }}
-                  >
-                    <Text style={styles.modalOptionText}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowRoleModal(false)}>
-                  <Text style={styles.modalCancelText}>{t('common.cancel', 'Cancel')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-
-          <Modal visible={showClientTypeModal} transparent animationType="fade" onRequestClose={() => setShowClientTypeModal(false)}>
-            <View style={styles.modalBackdrop}>
-              <View style={styles.modalCard}>
-                <Text style={styles.modalTitle}>{t('auth.clientType', 'Client Type')}</Text>
-                {clientTypeOptions.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value || 'empty-client-type'}
-                    style={styles.modalOption}
-                    onPress={() => {
-                      handleChange('clientType', opt.value);
-                      setShowClientTypeModal(false);
-                    }}
-                  >
-                    <Text style={styles.modalOptionText}>{opt.label}</Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowClientTypeModal(false)}>
-                  <Text style={styles.modalCancelText}>{t('common.cancel', 'Cancel')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Modal>
-        </ScrollView>
+            <View style={styles.bottomSpacer} />
+          </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  wrapper: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
   },
-  keyboardContainer: {
+  flex: {
     flex: 1,
-    minHeight: 0,
   },
-  scrollView: {
-    flex: 1,
-    minHeight: 0,
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    paddingTop: Platform.OS === 'android' ? spacing.xl + 20 : spacing.xl,
+    paddingBottom: spacing.xl,
   },
-  contentContainer: {
-    padding: spacing.xl,
-    paddingBottom: spacing.xxl,
-  },
-  logoContainer: {
+  logoWrap: {
     alignItems: 'center',
+    marginTop: spacing.md,
     marginBottom: spacing.lg,
   },
-  formContainer: {
-    backgroundColor: colors.white,
-    padding: spacing.xl,
-    borderRadius: borderRadius.lg,
+  logo: {
+    width: 110,
+    height: 110,
   },
-  title: {
-    fontSize: typography.fontSize.xxxl,
+  formContainer: {
+    gap: spacing.sm,
+  },
+  heading: {
+    fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
     textAlign: 'center',
-    marginBottom: spacing.xl,
   },
-  inputGroup: {
+  subheading: {
+    fontSize: typography.fontSize.sm,
+    color: colors.gray[600],
     marginBottom: spacing.md,
+    textAlign: 'center',
   },
-  row: {
+  roleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
   },
-  halfWidth: {
+  roleChip: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
+  roleChipActive: {
+    backgroundColor: colors.primary,
+  },
+  roleChipText: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.primary,
+  },
+  roleChipTextActive: {
+    color: colors.white,
+  },
+  inputGroup: {},
   label: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
@@ -472,132 +289,44 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   input: {
-    borderWidth: 2,
-    borderColor: colors.gray[200],
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     fontSize: typography.fontSize.md,
     color: colors.textDark,
-    backgroundColor: colors.white,
-  },
-  pickerContainer: {
-    borderWidth: 2,
-    borderColor: colors.gray[200],
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 50,
-    color: colors.textDark,
-    backgroundColor: colors.white,
-  },
-  iosSelector: {
-    borderWidth: 2,
-    borderColor: colors.gray[200],
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.white,
-    minHeight: 50,
-    paddingHorizontal: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  iosSelectorText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textDark,
-    flex: 1,
-  },
-  iosSelectorArrow: {
-    fontSize: typography.fontSize.lg,
-    color: colors.text,
-    marginLeft: spacing.sm,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-  },
-  modalTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.md,
-  },
-  modalOption: {
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray[100],
-  },
-  modalOptionText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textDark,
-  },
-  modalCancelBtn: {
-    marginTop: spacing.md,
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  modalCancelText: {
-    fontSize: typography.fontSize.md,
-    color: colors.primary,
-    fontWeight: typography.fontWeight.semibold,
+    borderWidth: 1,
+    borderColor: colors.gray[300],
   },
   submitButton: {
-    marginTop: spacing.md,
+    marginTop: spacing.sm,
+    borderRadius: borderRadius.lg,
   },
-  loginLink: {
+  errorText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.error,
+    textAlign: 'center',
+    fontWeight: typography.fontWeight.semibold,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
+  },
+  signInRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  loginText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text,
-  },
-  loginLinkText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.primary,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  successContainer: {
-    backgroundColor: colors.white,
-    padding: spacing.xl,
-    borderRadius: borderRadius.lg,
     alignItems: 'center',
+    marginTop: spacing.md,
   },
-  successIcon: {
-    fontSize: 48,
-    marginBottom: spacing.md,
+  signInMuted: {
+    color: colors.gray[600],
+    fontSize: typography.fontSize.sm,
   },
-  successTitle: {
-    fontSize: typography.fontSize.xxl,
+  signInLink: {
+    color: colors.primary,
+    fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.bold,
-    color: colors.success || '#16a34a',
-    textAlign: 'center',
-    marginBottom: spacing.md,
   },
-  successMessage: {
-    fontSize: typography.fontSize.md,
-    color: colors.text,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing.md,
-  },
-  successEmail: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-  },
-  goToLoginButton: {
-    width: '100%',
+  bottomSpacer: {
+    height: 40,
   },
 });
 

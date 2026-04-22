@@ -6,6 +6,7 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,37 @@ import { getAllUpdates, getTherapistById } from '../../utils/mockData';
 import Logo from '../../components/Common/Logo';
 
 const logoPng = require('../../../assets/gtg_logo.png');
+
+const CONNECT_LINKS = [
+  {
+    key: 'website1',
+    label: 'GTG PPEC',
+    icon: 'globe-outline',
+    color: '#1A5276',
+    url: 'https://glorytogodppec.com/en',
+  },
+  {
+    key: 'website2',
+    label: 'GTG School',
+    icon: 'school-outline',
+    color: '#2E86C1',
+    url: 'https://gtgschool.com/',
+  },
+  {
+    key: 'instagram',
+    label: 'Instagram',
+    icon: 'logo-instagram',
+    color: '#E1306C',
+    url: 'https://www.instagram.com/glorytogodppec/',
+  },
+  {
+    key: 'youtube',
+    label: 'YouTube',
+    icon: 'logo-youtube',
+    color: '#FF0000',
+    url: 'https://www.youtube.com/@glorytogodppec',
+  },
+];
 
 export default function HomeScreen({ navigation }) {
   const insets = useSafeAreaInsets();
@@ -92,6 +124,35 @@ export default function HomeScreen({ navigation }) {
           </Text>
         </View>
 
+        {/* Connect With Us */}
+        <View style={styles.connectCard}>
+          <Text style={styles.connectTitle}>Connect With Us</Text>
+          <Text style={styles.connectSubtitle}>
+            Visit our websites and follow us on social media
+          </Text>
+          <View style={styles.connectGrid}>
+            {CONNECT_LINKS.map((link) => (
+              <TouchableOpacity
+                key={link.key}
+                style={styles.connectItem}
+                activeOpacity={0.75}
+                onPress={() =>
+                  Linking.openURL(link.url).catch((e) =>
+                    console.warn('Failed to open link:', e)
+                  )
+                }
+              >
+                <View style={[styles.connectIconWrap, { backgroundColor: link.color }]}>
+                  <Ionicons name={link.icon} size={22} color={colors.white} />
+                </View>
+                <Text style={styles.connectLabel} numberOfLines={1}>
+                  {link.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
         {/* Updates Feed */}
         {updates.map(renderUpdate)}
 
@@ -156,6 +217,48 @@ const styles = StyleSheet.create({
   greetingSubtext: {
     fontSize: typography.fontSize.md,
     color: colors.textLight,
+  },
+  connectCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.sm,
+  },
+  connectTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: typography.fontWeight.bold,
+    color: colors.textDark,
+  },
+  connectSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: colors.textLight,
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  connectGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  connectItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  connectIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.sm,
+  },
+  connectLabel: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: typography.fontWeight.semibold,
+    color: colors.textDark,
+    textAlign: 'center',
   },
   updateCard: {
     backgroundColor: colors.white,

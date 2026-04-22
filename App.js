@@ -14,10 +14,12 @@ import ErrorBoundary from './src/components/Common/ErrorBoundary';
 
 // Screens
 import Login from './src/screens/Auth/Login';
+import Register from './src/screens/Auth/Register';
 import HomeScreen from './src/screens/Home/HomeScreen';
 import CategoriesScreen from './src/screens/Categories/CategoriesScreen';
 import CategoryDetailScreen from './src/screens/Categories/CategoryDetailScreen';
 import ChatScreen from './src/screens/Chat/ChatScreen';
+import NotificationsScreen from './src/screens/Notifications/NotificationsScreen';
 import ProfileScreen from './src/screens/Profile/ProfileScreen';
 
 import { navigationRef } from './src/utils/rootNavigation';
@@ -47,14 +49,30 @@ function MainTabs() {
         headerShown: false,
         tabBarActiveTintColor: THEME_PRIMARY,
         tabBarInactiveTintColor: '#718096',
+        tabBarLabelPosition: 'below-icon',
+        tabBarAllowFontScaling: false,
         tabBarStyle: {
           backgroundColor: '#fff',
           borderTopColor: '#e2e8f0',
+          borderTopWidth: 1,
           paddingBottom: bottomPadding,
-          paddingTop: 6,
-          height: 56 + bottomPadding,
+          paddingTop: 8,
+          height: 64 + bottomPadding,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarItemStyle: {
+          paddingVertical: 4,
+          flexDirection: 'column',
+        },
+        tabBarIconStyle: {
+          marginBottom: 2,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 2,
+          textAlign: 'center',
+          includeFontPadding: false,
+        },
       }}
     >
       <Tab.Screen
@@ -93,6 +111,16 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
+        name="NotificationsTab"
+        component={NotificationsScreen}
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons name={focused ? 'notifications' : 'notifications-outline'} size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="ProfileTab"
         component={ProfileScreen}
         options={{
@@ -110,6 +138,7 @@ function AuthStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={Login} />
+      <Stack.Screen name="Register" component={Register} />
     </Stack.Navigator>
   );
 }

@@ -4,7 +4,7 @@
     "slug": "glory-to-god-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/gtg_logo.png",
+    "icon": "./assets/icon-square.png",
     "userInterfaceStyle": "light",
     "splash": {
       "resizeMode": "contain",
@@ -25,11 +25,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.glorytogod.ppec"
+      "bundleIdentifier": "com.glorytogod.ppec",
+      "icon": "./assets/icon-square.png"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/gtg_logo.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1A5276"
       },
       "package": "com.glorytogod.ppec",
@@ -37,7 +38,9 @@
         "android.permission.RECORD_AUDIO"
       ]
     },
-    "web": {},
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "extra": {
       "eas": {
         "projectId": "a8ce6163-51d6-43e9-84a5-fe1a88d1e855"

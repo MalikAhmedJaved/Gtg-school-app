@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, spacing, typography, borderRadius } from '../../constants/theme';
+import { spacing, typography, borderRadius } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Global error storage
 let errorLogs = [];
@@ -111,6 +112,8 @@ export const copyErrorsToClipboard = () => {
 };
 
 const ErrorDisplay = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [errors, setErrors] = useState([]);
   const [visible, setVisible] = useState(false);
   const [detailsVisible, setDetailsVisible] = useState(false);
@@ -275,7 +278,8 @@ const ErrorDisplay = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   errorBadge: {
     position: 'absolute',
     top: 60,
@@ -304,7 +308,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '85%',
@@ -409,7 +413,7 @@ const styles = StyleSheet.create({
   },
   detailsContainer: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     paddingTop: spacing.xl,
     paddingHorizontal: spacing.md,
   },

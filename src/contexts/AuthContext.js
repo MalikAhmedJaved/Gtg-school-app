@@ -28,6 +28,17 @@ const DEMO_USERS = {
     password: 'admin123',
     role: 'admin',
   },
+  'employee@glorytogod.com': {
+    id: 3,
+    name: 'Gabriel Vargas',
+    email: 'employee@glorytogod.com',
+    password: 'employee123',
+    role: 'employee',
+    employeeId: 'NUR-65095829',
+    jobTitle: 'DON',
+    department: 'Nurse',
+    hiredAt: '2022-07-18',
+  },
 };
 
 export const AuthProvider = ({ children }) => {

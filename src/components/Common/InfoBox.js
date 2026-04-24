@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius } from '../../constants/theme';
+import { spacing, typography, borderRadius } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const InfoBox = ({
   title,
@@ -11,6 +12,7 @@ const InfoBox = ({
   icon,
   style,
 }) => {
+  const { colors } = useTheme();
   const typeConfig = {
     info: {
       bgColor: colors.backgroundDark,

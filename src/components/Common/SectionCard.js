@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const SectionCard = ({
   title,
@@ -11,6 +12,8 @@ const SectionCard = ({
   defaultExpanded = true,
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
@@ -42,9 +45,10 @@ const SectionCard = ({
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     borderRadius: borderRadius.xl,
     marginBottom: spacing.md,
     ...shadows.sm,

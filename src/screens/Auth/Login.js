@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Image, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, TouchableOpacity, Keyboard, StatusBar, useWindowDimensions } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, TextInput, Image, KeyboardAvoidingView, Platform, TouchableOpacity, StatusBar, useWindowDimensions } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, spacing, typography, borderRadius } from '../../constants/theme';
+import { useLanguage } from '../../contexts/LanguageContext';
+import { spacing, typography, borderRadius } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import Button from '../../components/Common/Button';
 
 const bgImage = require('../../../assets/background.png');
@@ -10,11 +12,14 @@ const bgImage = require('../../../assets/background.png');
 const IMG_ASPECT = 1080 / 1920;
 
 const Login = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { login } = useAuth();
+  const { t } = useLanguage();
   const { width: screenW, height: screenH } = useWindowDimensions();
   const [formData, setFormData] = useState({
-    email: 'parent@glorytogod.com',
-    password: 'parent123',
+    email: '',
+    password: '',
   });
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -59,17 +64,16 @@ const Login = ({ navigation }) => {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.container}>
-            <View style={styles.spacer} />
-            <View style={styles.formContainer}>
+        <View style={styles.container}>
+          <View style={styles.spacer} />
+          <View style={styles.formContainer}>
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email</Text>
+                <Text style={styles.label}>{t('app.auth.email', 'Email')}</Text>
                 <TextInput
                   style={styles.input}
                   value={formData.email}
                   onChangeText={(value) => handleChange('email', value)}
-                  placeholder="Email"
+                  placeholder={t('app.auth.email', 'Email')}
                   placeholderTextColor={colors.gray[400]}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -78,12 +82,12 @@ const Login = ({ navigation }) => {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Password</Text>
+                <Text style={styles.label}>{t('app.auth.password', 'Password')}</Text>
                 <TextInput
                   style={styles.input}
                   value={formData.password}
                   onChangeText={(value) => handleChange('password', value)}
-                  placeholder="Password"
+                  placeholder={t('app.auth.password', 'Password')}
                   placeholderTextColor={colors.gray[400]}
                   secureTextEntry
                   autoCapitalize="none"
@@ -91,7 +95,11 @@ const Login = ({ navigation }) => {
               </View>
 
               <Button
-                title={loading ? 'Signing in...' : 'Sign In'}
+                title={
+                  loading
+                    ? t('app.auth.signingIn', 'Signing in...')
+                    : t('app.auth.signIn', 'Sign In')
+                }
                 onPress={handleSubmit}
                 loading={loading}
                 variant="primary"
@@ -101,23 +109,35 @@ const Login = ({ navigation }) => {
               {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
 
               <TouchableOpacity
+                style={styles.forgotRow}
+                onPress={() => navigation.navigate('ForgotPassword')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.forgotLink}>
+                  {t('app.auth.forgotPassword', 'Forgot password?')}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.bottomSpacer}>
+              <TouchableOpacity
                 style={styles.signUpRow}
                 onPress={() => navigation.navigate('Register')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.signUpMuted}>Don't have an account? </Text>
-                <Text style={styles.signUpLink}>Sign up</Text>
+                <Text style={styles.signUpMuted}>
+                  {t('app.auth.dontHaveAccount', "Don't have an account?")}{' '}
+                </Text>
+                <Text style={styles.signUpLink}>{t('app.auth.signUp', 'Sign up')}</Text>
               </TouchableOpacity>
-            </View>
-            <View style={styles.bottomSpacer} />
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   wrapper: {
     flex: 1,
     backgroundColor: '#d4eaf7',
@@ -131,7 +151,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
   spacer: {
-    flex: 5,
+    flex: 6,
   },
   formContainer: {
     flex: 4,
@@ -140,6 +160,9 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     flex: 2,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: spacing.lg,
   },
   inputGroup: {
   },
@@ -171,11 +194,20 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: borderRadius.md,
   },
+  forgotRow: {
+    alignItems: 'center',
+    marginTop: -spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  forgotLink: {
+    color: colors.primary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: typography.fontWeight.bold,
+  },
   signUpRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: spacing.md,
     paddingVertical: spacing.xs,
   },
   signUpMuted: {

@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../contexts/AuthContext';
-import { colors, spacing, typography } from '../../constants/theme';
+import { spacing, typography } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const ProtectedRoute = ({ children, requiredRole }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { isAuthenticated, userRole, loading } = useAuth();
 
   if (loading) {
@@ -36,7 +39,8 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   return children;
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

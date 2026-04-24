@@ -1,149 +1,188 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Alert, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import React, { useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  TouchableOpacity,
+  Keyboard,
+  StatusBar,
+  ScrollView,
+  Alert,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { colors, spacing, typography, borderRadius } from '../../constants/theme';
+import { spacing, typography, borderRadius } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import Button from '../../components/Common/Button';
-import Logo from '../../components/Common/Logo';
-import api from '../../utils/api';
-import { getApiErrorMessage } from '../../utils/errorMessage';
 
-const ForgotPassword = () => {
+const logoImage = require('../../../assets/gtg_logo.png');
+
+const ForgotPassword = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useLanguage();
-  const navigation = useNavigation();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async () => {
+    setError('');
     if (!email.trim()) {
-      Alert.alert('Error', t('auth.emailRequired', 'Please enter your email address.'));
+      setError('Please enter your email.');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      setError('Please enter a valid email.');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await api.post('/auth/forgot-password', {
-        email: email.trim().toLowerCase(),
-      });
-
-      if (response.data?.success) {
-        Alert.alert(
-          t('auth.checkEmail', 'Check your email'),
-          t('auth.resetLinkSent', 'If that email exists, a password reset link has been sent.'),
-          [
-            {
-              text: t('common.ok', 'OK'),
-              onPress: () => navigation.navigate('ResetPassword'),
-            },
-          ]
-        );
-      } else {
-        Alert.alert('Error', response.data?.message || t('auth.genericError', 'Something went wrong. Please try again.'));
-      }
-    } catch (error) {
-      Alert.alert('Error', getApiErrorMessage(error, t('auth.genericError', 'Something went wrong. Please try again.')));
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      Alert.alert(
+        t('app.auth.resetSent', 'Reset link sent'),
+        t(
+          'app.auth.resetSentMessage',
+          'If that email is registered, you will receive a password reset link shortly.'
+        ),
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+    } catch (err) {
+      setError(err.message || 'Request failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.wrapper}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.contentContainer}
-          keyboardShouldPersistTaps="handled"
-        >
-      <View style={styles.logoContainer}>
-        <Logo width={110} height={110} />
-      </View>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <TouchableOpacity
+              style={styles.backRow}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.primary} />
+              <Text style={styles.backText}>{t('app.auth.backToLogin', 'Back to Sign in')}</Text>
+            </TouchableOpacity>
 
-      <View style={styles.formContainer}>
-        <Text style={styles.title}>{t('auth.forgotPassword', 'Forgot Password')}</Text>
-        <Text style={styles.subtitle}>
-          {t('auth.forgotPasswordHint', "Enter your email and we'll send you a password reset link.")}
-        </Text>
+            <View style={styles.logoWrap}>
+              <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{t('auth.email', 'Email')}</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder={t('auth.email', 'Email')}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+            <View style={styles.formContainer}>
+              <Text style={styles.heading}>
+                {t('app.auth.resetTitle', 'Reset your password')}
+              </Text>
+              <Text style={styles.subheading}>
+                {t(
+                  'app.auth.resetSubtitle',
+                  'Enter your email and we will send you a reset link'
+                )}
+              </Text>
 
-        <Button
-          title={loading ? t('common.loading', 'Sending...') : t('auth.sendResetLink', 'Send Reset Link')}
-          onPress={handleSubmit}
-          loading={loading}
-          variant="primary"
-          style={styles.submitButton}
-        />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>{t('app.auth.email', 'Email')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={email}
+                  onChangeText={(v) => {
+                    if (error) setError('');
+                    setEmail(v);
+                  }}
+                  placeholder="you@example.com"
+                  placeholderTextColor={colors.gray[400]}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
 
-        <Text style={styles.linkText} onPress={() => navigation.navigate('ResetPassword')}>
-          {t('auth.haveResetToken', 'Already have a reset token? Reset password')}
-        </Text>
+              <Button
+                title={
+                  loading
+                    ? t('app.auth.sending', 'Sending...')
+                    : t('app.auth.sendResetLink', 'Send reset link')
+                }
+                onPress={handleSubmit}
+                loading={loading}
+                variant="primary"
+                style={styles.submitButton}
+              />
 
-        <Text style={styles.linkText} onPress={() => navigation.navigate('Login')}>
-          {t('auth.backToLogin', 'Back to Login')}
-        </Text>
-      </View>
-        </ScrollView>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
+const makeStyles = (colors) =>
+  StyleSheet.create({
+  wrapper: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
   },
-  contentContainer: {
+  flex: {
+    flex: 1,
+  },
+  scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: spacing.xl,
-    paddingBottom: 40,
+    paddingHorizontal: spacing.xl,
+    paddingTop: Platform.OS === 'android' ? spacing.xl + 20 : spacing.xl,
+    paddingBottom: spacing.xl,
   },
-  logoContainer: {
+  backRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  backText: {
+    fontSize: typography.fontSize.sm,
+    color: colors.primary,
+    fontWeight: typography.fontWeight.semibold,
+  },
+  logoWrap: {
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  logo: {
+    width: 130,
+    height: 130,
   },
   formContainer: {
-    backgroundColor: colors.white,
-    padding: spacing.xl,
-    borderRadius: borderRadius.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
+    gap: spacing.sm,
   },
-  title: {
+  heading: {
     fontSize: typography.fontSize.xxl,
     fontWeight: typography.fontWeight.bold,
     color: colors.textDark,
     textAlign: 'center',
-    marginBottom: spacing.sm,
   },
-  subtitle: {
+  subheading: {
     fontSize: typography.fontSize.sm,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  inputGroup: {
+    color: colors.gray[600],
     marginBottom: spacing.md,
+    textAlign: 'center',
   },
+  inputGroup: {},
   label: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
@@ -151,23 +190,26 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   input: {
-    borderWidth: 2,
-    borderColor: colors.gray[200],
-    borderRadius: borderRadius.md,
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
     padding: spacing.md,
     fontSize: typography.fontSize.md,
     color: colors.textDark,
-    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.gray[300],
   },
   submitButton: {
     marginTop: spacing.sm,
+    borderRadius: borderRadius.lg,
   },
-  linkText: {
-    marginTop: spacing.md,
-    textAlign: 'center',
-    color: colors.primary,
+  errorText: {
     fontSize: typography.fontSize.sm,
+    color: colors.error,
+    textAlign: 'center',
     fontWeight: typography.fontWeight.semibold,
+    padding: spacing.sm,
+    borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
   },
 });
 

@@ -1,7 +1,7 @@
 import en from './en.json';
-import da from './da.json';
+import es from './es.json';
 
 export default {
   en,
-  da,
+  es,
 };

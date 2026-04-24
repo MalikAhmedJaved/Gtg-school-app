@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius } from '../../constants/theme';
+import { spacing, typography, borderRadius } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import Button from '../../components/Common/Button';
 
 const logoImage = require('../../../assets/gtg_logo.png');
@@ -26,6 +27,8 @@ const ROLES = [
 ];
 
 const Register = ({ navigation }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -215,10 +218,11 @@ const Register = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   wrapper: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
   },
   flex: {
     flex: 1,
@@ -266,7 +270,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: spacing.sm + 2,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     borderWidth: 1.5,
     borderColor: colors.primary,
   },
@@ -289,7 +293,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   input: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     fontSize: typography.fontSize.md,

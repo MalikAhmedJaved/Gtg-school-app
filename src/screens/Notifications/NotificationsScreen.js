@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Image,
   Linking,
@@ -13,7 +13,8 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const DUMMY_POSTS = [
   {
@@ -102,6 +103,8 @@ const SOURCE_META = {
 };
 
 const NotificationsScreen = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [refreshing, setRefreshing] = useState(false);
   const [posts, setPosts] = useState(DUMMY_POSTS);
 
@@ -182,119 +185,120 @@ const NotificationsScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f4f8fc',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
-  },
-  header: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.white,
-    borderBottomColor: colors.gray[200],
-    borderBottomWidth: 1,
-  },
-  title: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text,
-  },
-  subtitle: {
-    marginTop: 2,
-    fontSize: typography.fontSize.sm,
-    color: colors.gray[600],
-  },
-  listWrap: {
-    flex: 1,
-  },
-  listContent: {
-    padding: spacing.md,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl * 2,
-    gap: spacing.xs,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.gray[700],
-  },
-  emptyText: {
-    fontSize: typography.fontSize.sm,
-    color: colors.gray[500],
-  },
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.gray[200],
-    overflow: 'hidden',
-    ...shadows.sm,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  sourceBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
-  },
-  sourceBadgeText: {
-    color: colors.white,
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-  cardTime: {
-    fontSize: typography.fontSize.xs,
-    color: colors.gray[500],
-  },
-  thumbnail: {
-    width: '100%',
-    height: 180,
-    backgroundColor: colors.gray[100],
-  },
-  cardBody: {
-    padding: spacing.md,
-    gap: 4,
-  },
-  cardTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.text,
-  },
-  cardHandle: {
-    fontSize: typography.fontSize.xs,
-    color: colors.gray[500],
-    marginBottom: spacing.xs,
-  },
-  cardMessage: {
-    color: colors.gray[700],
-    fontSize: typography.fontSize.sm,
-    lineHeight: 20,
-  },
-  openRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: spacing.sm,
-  },
-  openLink: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#f4f8fc',
+      paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    },
+    header: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      backgroundColor: colors.card,
+      borderBottomColor: colors.gray[200],
+      borderBottomWidth: 1,
+    },
+    title: {
+      fontSize: typography.fontSize.xxl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text,
+    },
+    subtitle: {
+      marginTop: 2,
+      fontSize: typography.fontSize.sm,
+      color: colors.gray[600],
+    },
+    listWrap: {
+      flex: 1,
+    },
+    listContent: {
+      padding: spacing.md,
+      paddingBottom: spacing.xl,
+      gap: spacing.md,
+    },
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.xl * 2,
+      gap: spacing.xs,
+    },
+    emptyTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.gray[700],
+    },
+    emptyText: {
+      fontSize: typography.fontSize.sm,
+      color: colors.gray[500],
+    },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: colors.gray[200],
+      overflow: 'hidden',
+      ...shadows.sm,
+    },
+    cardHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.sm,
+    },
+    sourceBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: borderRadius.full,
+    },
+    sourceBadgeText: {
+      color: colors.white,
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.semibold,
+    },
+    cardTime: {
+      fontSize: typography.fontSize.xs,
+      color: colors.gray[500],
+    },
+    thumbnail: {
+      width: '100%',
+      height: 180,
+      backgroundColor: colors.gray[100],
+    },
+    cardBody: {
+      padding: spacing.md,
+      gap: 4,
+    },
+    cardTitle: {
+      fontSize: typography.fontSize.md,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.text,
+    },
+    cardHandle: {
+      fontSize: typography.fontSize.xs,
+      color: colors.gray[500],
+      marginBottom: spacing.xs,
+    },
+    cardMessage: {
+      color: colors.gray[700],
+      fontSize: typography.fontSize.sm,
+      lineHeight: 20,
+    },
+    openRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: spacing.sm,
+    },
+    openLink: {
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.semibold,
+    },
+  });
 
 export default NotificationsScreen;

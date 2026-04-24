@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import { getUpdatesByCategory, getTherapistById } from '../../utils/mockData';
 
 export default function CategoryDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { category } = route.params;
   const updates = getUpdatesByCategory(category.id);
 
@@ -96,128 +99,129 @@ export default function CategoryDetailScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.lg,
-  },
-  backButton: {
-    padding: spacing.sm,
-    marginRight: spacing.xs,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  headerSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  scrollContent: {
-    padding: spacing.md,
-  },
-  updateCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    ...shadows.sm,
-  },
-  dateTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.gray[100],
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.full,
-    marginBottom: spacing.sm,
-  },
-  dateTagText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textLight,
-  },
-  updateHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  therapistAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  avatarText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  therapistInfo: {
-    flex: 1,
-  },
-  therapistName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textDark,
-  },
-  updateTime: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textLight,
-    marginTop: 2,
-  },
-  updateMessage: {
-    fontSize: typography.fontSize.md,
-    color: colors.text,
-    lineHeight: 22,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xxl * 2,
-    paddingHorizontal: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.gray[500],
-    marginTop: spacing.md,
-  },
-  emptyText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-  singlePhotoWrap: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  singlePhoto: {
-    width: 120,
-    height: 90,
-    borderRadius: borderRadius.md,
-  },
-  photoRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  gridPhoto: {
-    width: 120,
-    height: 90,
-    borderRadius: borderRadius.md,
-  },
-  bottomPadding: {
-    height: spacing.xl,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.lg,
+    },
+    backButton: {
+      padding: spacing.sm,
+      marginRight: spacing.xs,
+    },
+    headerTitle: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.white,
+    },
+    headerSubtitle: {
+      fontSize: typography.fontSize.sm,
+      color: 'rgba(255,255,255,0.8)',
+    },
+    scrollContent: {
+      padding: spacing.md,
+    },
+    updateCard: {
+      backgroundColor: colors.card,
+      borderRadius: borderRadius.lg,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      ...shadows.sm,
+    },
+    dateTag: {
+      alignSelf: 'flex-start',
+      backgroundColor: colors.gray[100],
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: borderRadius.full,
+      marginBottom: spacing.sm,
+    },
+    dateTagText: {
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.textLight,
+    },
+    updateHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    therapistAvatar: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+    },
+    avatarText: {
+      fontSize: typography.fontSize.md,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.white,
+    },
+    therapistInfo: {
+      flex: 1,
+    },
+    therapistName: {
+      fontSize: typography.fontSize.md,
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.textDark,
+    },
+    updateTime: {
+      fontSize: typography.fontSize.xs,
+      color: colors.textLight,
+      marginTop: 2,
+    },
+    updateMessage: {
+      fontSize: typography.fontSize.md,
+      color: colors.text,
+      lineHeight: 22,
+    },
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: spacing.xxl * 2,
+      paddingHorizontal: spacing.xl,
+    },
+    emptyTitle: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.gray[500],
+      marginTop: spacing.md,
+    },
+    emptyText: {
+      fontSize: typography.fontSize.md,
+      color: colors.textLight,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+    },
+    singlePhotoWrap: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    singlePhoto: {
+      width: 120,
+      height: 90,
+      borderRadius: borderRadius.md,
+    },
+    photoRow: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+    },
+    gridPhoto: {
+      width: 120,
+      height: 90,
+      borderRadius: borderRadius.md,
+    },
+    bottomPadding: {
+      height: spacing.xl,
+    },
+  });

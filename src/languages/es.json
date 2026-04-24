@@ -1,0 +1,132 @@
+{
+  "app": {
+    "tabs": {
+      "home": "Inicio",
+      "therapies": "Terapias",
+      "compliance": "Cumplimiento",
+      "chat": "Chat",
+      "notifications": "Notificaciones",
+      "profile": "Perfil"
+    },
+    "compliance": {
+      "title": "Mi cumplimiento",
+      "employee": "Empleado",
+      "needsAttention": "Requiere atención",
+      "pending": "Pendiente",
+      "onFile": "En archivo",
+      "emptyForFilter": "Nada aquí.",
+      "required": "Requerido",
+      "currentFile": "Archivo actual",
+      "history": "Historial",
+      "uploadedOn": "Subido",
+      "expiresAt": "Vence",
+      "doesNotExpire": "No vence",
+      "approval": "Aprobación",
+      "approvedBy": "Aprobado por",
+      "rejected": "Rechazado",
+      "awaitingReview": "Esperando revisión del gerente",
+      "notUploaded": "Aún no se ha subido ningún archivo",
+      "upload": "Subir documento",
+      "uploadNew": "Subir nueva versión",
+      "uploading": "Subiendo...",
+      "managerNote": "Nota del gerente",
+      "noHistory": "Sin historial todavía.",
+      "eventUploaded": "Subido",
+      "eventApproved": "Aprobado",
+      "eventRejected": "Rechazado",
+      "permissionTitle": "Permiso requerido",
+      "permissionBody": "Permite el acceso a fotos para subir documentos.",
+      "uploadSuccess": "Subido",
+      "uploadSuccessBody": "Documento subido. Un gerente lo revisará pronto.",
+      "uploadError": "Error al subir",
+      "uploadErrorBody": "No se pudo subir el documento. Intenta de nuevo.",
+      "filters": {
+        "all": "Todos",
+        "attention": "Requiere atención",
+        "valid": "Vigentes",
+        "pending": "Pendientes"
+      }
+    },
+    "home": {
+      "goodMorning": "Buenos días",
+      "goodAfternoon": "Buenas tardes",
+      "goodEvening": "Buenas noches",
+      "parent": "Padre",
+      "updatesToday": "Tus actualizaciones de los terapeutas hoy:",
+      "connectWithUs": "Conéctate con nosotros",
+      "connectSubtitle": "Visita nuestros sitios web y redes sociales",
+      "gallery": "Galería de fotos",
+      "gallerySubtitle": "Fotos y videos del centro",
+      "announcements": "Anuncios",
+      "announcementsSubtitle": "Noticias, eventos y novedades"
+    },
+    "gallery": {
+      "title": "Galería de fotos",
+      "empty": "No hay fotos todavía.",
+      "photos": "Fotos",
+      "videos": "Videos"
+    },
+    "announcements": {
+      "title": "Anuncios y eventos",
+      "empty": "No hay anuncios todavía."
+    },
+    "settings": {
+      "title": "Configuración",
+      "appearance": "Apariencia",
+      "themeDescription": "Elige cómo se ve la app",
+      "themeSystem": "Sistema",
+      "themeLight": "Claro",
+      "themeDark": "Oscuro",
+      "language": "Idioma",
+      "languageDescription": "Elige tu idioma preferido",
+      "english": "Inglés",
+      "spanish": "Español",
+      "notifications": "Notificaciones",
+      "pushNotifications": "Notificaciones push",
+      "pushDescription": "Recibir alertas de nuevas actualizaciones",
+      "emailNotifications": "Notificaciones por correo",
+      "account": "Cuenta",
+      "changePassword": "Cambiar contraseña",
+      "about": "Acerca de",
+      "version": "Versión",
+      "signOut": "Cerrar sesión",
+      "signOutConfirm": "¿Seguro que quieres cerrar sesión?",
+      "cancel": "Cancelar",
+      "confirm": "Confirmar"
+    },
+    "auth": {
+      "signIn": "Iniciar sesión",
+      "signingIn": "Iniciando sesión...",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
+      "dontHaveAccount": "¿No tienes una cuenta?",
+      "signUp": "Regístrate",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "resetTitle": "Restablece tu contraseña",
+      "sendResetLink": "Enviar enlace",
+      "sending": "Enviando...",
+      "resetSent": "Enlace enviado",
+      "backToLogin": "Volver a iniciar sesión"
+    }
+  },
+  "auth": {
+    "resetPassword": "Restablecer contraseña",
+    "resetPasswordHint": "Ingresa el token de restablecimiento y tu nueva contraseña.",
+    "resetToken": "Token de restablecimiento",
+    "resetTokenPlaceholder": "Pega el token del enlace del correo",
+    "resetTokenRequired": "Por favor ingresa el token de restablecimiento.",
+    "newPassword": "Nueva contraseña",
+    "confirmNewPassword": "Confirmar nueva contraseña",
+    "passwordMin": "La contraseña debe tener al menos 6 caracteres.",
+    "passwordsDontMatch": "Las contraseñas no coinciden.",
+    "passwordReset": "Contraseña restablecida",
+    "passwordResetSuccess": "Contraseña restablecida correctamente. Ahora puedes iniciar sesión.",
+    "needResetLink": "¿Necesitas un enlace de restablecimiento? Olvidaste contraseña",
+    "backToLogin": "Volver a iniciar sesión",
+    "genericError": "Algo salió mal. Por favor intenta de nuevo."
+  },
+  "common": {
+    "loading": "Cargando...",
+    "ok": "Aceptar"
+  }
+}

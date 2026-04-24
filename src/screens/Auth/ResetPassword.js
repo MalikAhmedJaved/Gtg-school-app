@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, Alert, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { colors, spacing, typography, borderRadius } from '../../constants/theme';
+import { spacing, typography, borderRadius } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import Button from '../../components/Common/Button';
 import Logo from '../../components/Common/Logo';
 import api from '../../utils/api';
 import { getApiErrorMessage } from '../../utils/errorMessage';
 
 const ResetPassword = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useLanguage();
   const navigation = useNavigation();
   const route = useRoute();
@@ -136,7 +139,8 @@ const ResetPassword = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = (colors) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -152,7 +156,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   formContainer: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
     padding: spacing.xl,
     borderRadius: borderRadius.lg,
     shadowColor: '#000',
@@ -190,7 +194,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     fontSize: typography.fontSize.md,
     color: colors.textDark,
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
   },
   submitButton: {
     marginTop: spacing.sm,

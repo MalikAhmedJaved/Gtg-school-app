@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
-import { colors, spacing, typography, borderRadius } from '../constants/theme';
+import { spacing, typography, borderRadius } from '../constants/theme';
+import { useTheme } from './ThemeContext';
 
 const ToastContext = createContext();
 
@@ -13,6 +14,8 @@ export const useToast = () => {
 };
 
 const Toast = ({ message, type = 'info', onClose }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [fadeAnim] = useState(new Animated.Value(0));
 
   React.useEffect(() => {
@@ -81,7 +84,7 @@ export const ToastProvider = ({ children }) => {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <View style={styles.toastContainer}>
+      <View style={containerStyles.toastContainer}>
         {toasts.map((toast) => (
           <Toast
             key={toast.id}
@@ -95,7 +98,7 @@ export const ToastProvider = ({ children }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const containerStyles = StyleSheet.create({
   toastContainer: {
     position: 'absolute',
     top: 60,
@@ -105,31 +108,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     pointerEvents: 'box-none',
   },
-  toast: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    minWidth: 200,
-    maxWidth: '90%',
-  },
-  toastText: {
-    color: colors.white,
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.medium,
-    flex: 1,
-  },
-  closeButton: {
-    marginLeft: spacing.sm,
-    padding: spacing.xs,
-  },
-  closeButtonText: {
-    color: colors.white,
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-  },
 });
+
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    toast: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: borderRadius.md,
+      marginHorizontal: spacing.md,
+      marginBottom: spacing.sm,
+      minWidth: 200,
+      maxWidth: '90%',
+    },
+    toastText: {
+      color: colors.white,
+      fontSize: typography.fontSize.md,
+      fontWeight: typography.fontWeight.medium,
+      flex: 1,
+    },
+    closeButton: {
+      marginLeft: spacing.sm,
+      padding: spacing.xs,
+    },
+    closeButtonText: {
+      color: colors.white,
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.bold,
+    },
+  });

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { spacing, typography, borderRadius, shadows } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import { MOCK_CHAT_CONVERSATIONS, MOCK_MESSAGES, THERAPISTS } from '../../utils/mockData';
 
 // ─── CONVERSATION LIST ──────────────────────────────────────
 function ConversationList({ onSelect }) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const renderItem = ({ item }) => {
     const { therapist } = item;
@@ -80,6 +83,8 @@ function ConversationList({ onSelect }) {
 // ─── CHAT THREAD ────────────────────────────────────────────
 function ChatThread({ conversation, onBack }) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { therapist } = conversation;
   const [messages, setMessages] = useState(MOCK_MESSAGES[therapist.id] || []);
   const [input, setInput] = useState('');
@@ -213,253 +218,254 @@ export default function ChatScreen() {
 }
 
 // ─── STYLES ─────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
-  headerTitle: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  headerSubtitle: {
-    fontSize: typography.fontSize.sm,
-    color: 'rgba(255,255,255,0.7)',
-    marginTop: spacing.xs,
-  },
-  listContent: {
-    padding: spacing.md,
-  },
-  conversationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.sm,
-    ...shadows.sm,
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  avatarText: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  conversationBody: {
-    flex: 1,
-  },
-  conversationRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  conversationName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.textDark,
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  conversationTime: {
-    fontSize: typography.fontSize.xs,
-    color: colors.textLight,
-  },
-  conversationPreview: {
-    fontSize: typography.fontSize.sm,
-    color: colors.text,
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  unreadText: {
-    fontWeight: typography.fontWeight.semibold,
-    color: colors.textDark,
-  },
-  roleTag: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: typography.fontWeight.medium,
-    marginTop: 2,
-  },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  // ── Thread ──
-  threadContainer: {
-    flex: 1,
-    backgroundColor: colors.backgroundLight,
-  },
-  threadHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.primary,
-  },
-  backButton: {
-    padding: spacing.sm,
-    marginRight: spacing.xs,
-  },
-  threadAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  threadAvatarText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  threadHeaderInfo: {
-    flex: 1,
-  },
-  threadTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  threadRole: {
-    fontSize: typography.fontSize.xs,
-    color: 'rgba(255,255,255,0.7)',
-  },
-  messagesList: {
-    padding: spacing.md,
-    flexGrow: 1,
-  },
-  messageBubble: {
-    flexDirection: 'row',
-    marginBottom: spacing.md,
-    maxWidth: '85%',
-  },
-  messageMe: {
-    alignSelf: 'flex-end',
-    flexDirection: 'row-reverse',
-  },
-  messageOther: {
-    alignSelf: 'flex-start',
-  },
-  msgAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-    marginTop: 4,
-  },
-  msgAvatarText: {
-    fontSize: 12,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.white,
-  },
-  msgContent: {
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    flexShrink: 1,
-  },
-  msgContentMe: {
-    backgroundColor: colors.primary,
-    borderBottomRightRadius: 4,
-  },
-  msgContentOther: {
-    backgroundColor: colors.white,
-    borderBottomLeftRadius: 4,
-    ...shadows.sm,
-  },
-  messageText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textDark,
-    lineHeight: 22,
-  },
-  messageTextMe: {
-    color: colors.white,
-  },
-  messageTime: {
-    fontSize: 10,
-    color: colors.textLight,
-    marginTop: 4,
-    alignSelf: 'flex-end',
-  },
-  messageTimeMe: {
-    color: 'rgba(255,255,255,0.7)',
-  },
-  // ── Input ──
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    padding: spacing.sm,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.gray[200],
-  },
-  chatInput: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
-    borderWidth: 1,
-    borderColor: colors.gray[300],
-    borderRadius: 20,
-    paddingHorizontal: spacing.md,
-    paddingVertical: Platform.OS === 'ios' ? spacing.sm : spacing.xs,
-    fontSize: typography.fontSize.md,
-    color: colors.textDark,
-    backgroundColor: colors.backgroundLight,
-    marginRight: spacing.sm,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: colors.gray[300],
-  },
-  // ── Common ──
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    color: colors.gray[500],
-    marginTop: spacing.md,
-  },
-  emptyText: {
-    fontSize: typography.fontSize.md,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
-});
+const makeStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.lg,
+    },
+    headerTitle: {
+      fontSize: typography.fontSize.xxl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.white,
+    },
+    headerSubtitle: {
+      fontSize: typography.fontSize.sm,
+      color: 'rgba(255,255,255,0.7)',
+      marginTop: spacing.xs,
+    },
+    listContent: {
+      padding: spacing.md,
+    },
+    conversationItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      padding: spacing.md,
+      borderRadius: borderRadius.lg,
+      marginBottom: spacing.sm,
+      ...shadows.sm,
+    },
+    avatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+    },
+    avatarText: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.white,
+    },
+    conversationBody: {
+      flex: 1,
+    },
+    conversationRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 2,
+    },
+    conversationName: {
+      fontSize: typography.fontSize.md,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.textDark,
+      flex: 1,
+      marginRight: spacing.sm,
+    },
+    conversationTime: {
+      fontSize: typography.fontSize.xs,
+      color: colors.textLight,
+    },
+    conversationPreview: {
+      fontSize: typography.fontSize.sm,
+      color: colors.text,
+      flex: 1,
+      marginRight: spacing.sm,
+    },
+    unreadText: {
+      fontWeight: typography.fontWeight.semibold,
+      color: colors.textDark,
+    },
+    roleTag: {
+      fontSize: typography.fontSize.xs,
+      fontWeight: typography.fontWeight.medium,
+      marginTop: 2,
+    },
+    badge: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 6,
+    },
+    badgeText: {
+      fontSize: 11,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.white,
+    },
+    // ── Thread ──
+    threadContainer: {
+      flex: 1,
+      backgroundColor: colors.backgroundLight,
+    },
+    threadHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingBottom: spacing.md,
+      backgroundColor: colors.primary,
+    },
+    backButton: {
+      padding: spacing.sm,
+      marginRight: spacing.xs,
+    },
+    threadAvatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.sm,
+    },
+    threadAvatarText: {
+      fontSize: typography.fontSize.md,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.white,
+    },
+    threadHeaderInfo: {
+      flex: 1,
+    },
+    threadTitle: {
+      fontSize: typography.fontSize.lg,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.white,
+    },
+    threadRole: {
+      fontSize: typography.fontSize.xs,
+      color: 'rgba(255,255,255,0.7)',
+    },
+    messagesList: {
+      padding: spacing.md,
+      flexGrow: 1,
+    },
+    messageBubble: {
+      flexDirection: 'row',
+      marginBottom: spacing.md,
+      maxWidth: '85%',
+    },
+    messageMe: {
+      alignSelf: 'flex-end',
+      flexDirection: 'row-reverse',
+    },
+    messageOther: {
+      alignSelf: 'flex-start',
+    },
+    msgAvatar: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.sm,
+      marginTop: 4,
+    },
+    msgAvatarText: {
+      fontSize: 12,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.white,
+    },
+    msgContent: {
+      padding: spacing.md,
+      borderRadius: borderRadius.lg,
+      flexShrink: 1,
+    },
+    msgContentMe: {
+      backgroundColor: colors.primary,
+      borderBottomRightRadius: 4,
+    },
+    msgContentOther: {
+      backgroundColor: colors.card,
+      borderBottomLeftRadius: 4,
+      ...shadows.sm,
+    },
+    messageText: {
+      fontSize: typography.fontSize.md,
+      color: colors.textDark,
+      lineHeight: 22,
+    },
+    messageTextMe: {
+      color: colors.white,
+    },
+    messageTime: {
+      fontSize: 10,
+      color: colors.textLight,
+      marginTop: 4,
+      alignSelf: 'flex-end',
+    },
+    messageTimeMe: {
+      color: 'rgba(255,255,255,0.7)',
+    },
+    // ── Input ──
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      padding: spacing.sm,
+      paddingHorizontal: spacing.md,
+      backgroundColor: colors.card,
+      borderTopWidth: 1,
+      borderTopColor: colors.gray[200],
+    },
+    chatInput: {
+      flex: 1,
+      minHeight: 40,
+      maxHeight: 100,
+      borderWidth: 1,
+      borderColor: colors.gray[300],
+      borderRadius: 20,
+      paddingHorizontal: spacing.md,
+      paddingVertical: Platform.OS === 'ios' ? spacing.sm : spacing.xs,
+      fontSize: typography.fontSize.md,
+      color: colors.textDark,
+      backgroundColor: colors.backgroundLight,
+      marginRight: spacing.sm,
+    },
+    sendButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sendButtonDisabled: {
+      backgroundColor: colors.gray[300],
+    },
+    // ── Common ──
+    centered: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.xl,
+    },
+    emptyTitle: {
+      fontSize: typography.fontSize.xl,
+      fontWeight: typography.fontWeight.bold,
+      color: colors.gray[500],
+      marginTop: spacing.md,
+    },
+    emptyText: {
+      fontSize: typography.fontSize.md,
+      color: colors.textLight,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+    },
+  });

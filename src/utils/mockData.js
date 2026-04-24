@@ -280,3 +280,126 @@ export function getTodayUpdates() {
 export function getAllUpdates() {
   return [...THERAPY_UPDATES].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 }
+
+// ──────────────────────────────────────────────────────────────
+// COMPLIANCE (employee credentialing)
+// Document catalog follows Florida AHCA PPEC staffing requirements
+// (rule 59A-13) as reflected in the client's compliance spreadsheet.
+// ──────────────────────────────────────────────────────────────
+
+export const COMPLIANCE_CATEGORIES = {
+  licensing: { id: 'licensing', name: 'Licensing & Identity', icon: 'id-card', color: '#1A5276' },
+  training: { id: 'training', name: 'Mandatory Training', icon: 'school', color: '#8E44AD' },
+  health: { id: 'health', name: 'Health & Safety', icon: 'medkit', color: '#27AE60' },
+  employment: { id: 'employment', name: 'Employment Records', icon: 'document-text', color: '#E67E22' },
+};
+
+// renewalMonths === null means the document does not expire.
+export const COMPLIANCE_DOCUMENT_TYPES = [
+  // Licensing & identity
+  { id: 'professional_license', name: 'Professional License', category: 'licensing', renewalMonths: 24, required: true, description: 'Your current state professional license (RN / LPN / CNA / OT / PT / SLP / RBT).' },
+  { id: 'driver_license', name: 'Driver License', category: 'licensing', renewalMonths: null, required: true, description: 'A valid driver license or state-issued ID.' },
+  { id: 'ssn', name: 'Social Security Card', category: 'licensing', renewalMonths: null, required: true, description: 'A copy of your Social Security card.' },
+  { id: 'i9', name: 'I-9 Employment Eligibility', category: 'licensing', renewalMonths: null, required: true, description: 'Federal employment eligibility verification.' },
+  { id: 'w4', name: 'W-4 Tax Form', category: 'licensing', renewalMonths: null, required: true, description: 'Federal tax withholding form.' },
+  { id: 'legal_status', name: 'Legal Status', category: 'licensing', renewalMonths: null, required: true, description: 'Proof of legal work status (if applicable).' },
+
+  // Mandatory training (Florida state-required, most renew every 2 years)
+  { id: 'hipaa', name: 'HIPAA Training', category: 'training', renewalMonths: 24, required: true, description: 'Protecting patient health information.' },
+  { id: 'hiv_aids', name: 'HIV / AIDS Training', category: 'training', renewalMonths: 24, required: true, description: 'Florida-required HIV/AIDS awareness training.' },
+  { id: 'domestic_violence', name: 'Domestic Violence Training', category: 'training', renewalMonths: 36, required: true, description: 'Florida-required domestic violence awareness.' },
+  { id: 'child_abuse', name: 'Child Abuse Recognition', category: 'training', renewalMonths: 24, required: true, description: 'Recognizing and reporting suspected child abuse.' },
+  { id: 'medical_errors', name: 'Medical Errors Prevention', category: 'training', renewalMonths: 24, required: true, description: 'Florida-required medical errors training.' },
+  { id: 'laws_rules', name: 'Laws & Rules', category: 'training', renewalMonths: 24, required: true, description: 'Florida laws and rules for your profession.' },
+  { id: 'infection_control', name: 'Infection Control', category: 'training', renewalMonths: 24, required: true, description: 'Infection prevention and control protocols.' },
+  { id: 'osha_tb', name: 'OSHA / TB Screening', category: 'training', renewalMonths: 12, required: true, description: 'Annual OSHA bloodborne pathogens and TB screening.' },
+  { id: 'impairment', name: 'Impairment in the Workplace', category: 'training', renewalMonths: 24, required: false, description: 'Recognizing impairment in healthcare professionals.' },
+
+  // Health & safety
+  { id: 'cpr', name: 'CPR Certification', category: 'health', renewalMonths: 24, required: true, description: 'Current CPR (BLS) certification from an approved provider.' },
+  { id: 'physical_exam', name: 'Physical Exam', category: 'health', renewalMonths: 12, required: true, description: 'Annual physical exam signed by a physician.' },
+  { id: 'hepatitis_b', name: 'Hepatitis B (or Refusal)', category: 'health', renewalMonths: null, required: true, description: 'Hepatitis B vaccination record or signed refusal.' },
+
+  // Employment records
+  { id: 'application', name: 'Employment Application', category: 'employment', renewalMonths: null, required: true, description: 'Signed employment application.' },
+  { id: 'resume', name: 'Resume', category: 'employment', renewalMonths: null, required: false, description: 'Current resume or CV.' },
+  { id: 'background_check', name: 'Background Check', category: 'employment', renewalMonths: 60, required: true, description: 'Level 2 background screening (AHCA compliant).' },
+  { id: 'orientation', name: 'Orientation', category: 'employment', renewalMonths: null, required: true, description: 'Completion of new-hire orientation.' },
+  { id: 'year_eval', name: 'Annual Evaluation', category: 'employment', renewalMonths: 12, required: true, description: 'Annual performance evaluation.' },
+  { id: 'liability_insurance', name: 'Liability Insurance', category: 'employment', renewalMonths: 12, required: false, description: 'Current professional liability insurance (if applicable).' },
+  { id: 'confidentiality', name: 'Confidentiality Statement', category: 'employment', renewalMonths: null, required: true, description: 'Signed confidentiality agreement.' },
+  { id: 'attestation', name: 'Attestation of Compliance', category: 'employment', renewalMonths: 12, required: true, description: 'Annual attestation of compliance with PPEC policies.' },
+];
+
+export function getComplianceDocumentType(typeId) {
+  return COMPLIANCE_DOCUMENT_TYPES.find((t) => t.id === typeId);
+}
+
+// ─── MOCK DATA FOR DEMO EMPLOYEE ────────────────────────────────
+// Demo employee: NUR-65095829 Vargas, Gabriel (DON) — from the Excel.
+// Mix of statuses so every state is reachable from the UI.
+const today = new Date();
+const addMonths = (months) => {
+  const d = new Date(today);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString();
+};
+const subMonths = (months) => {
+  const d = new Date(today);
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString();
+};
+
+export const MOCK_EMPLOYEE_DOCUMENTS = [
+  // APPROVED & valid (green)
+  { id: 'doc-1', typeId: 'professional_license', fileName: 'RN_License_2025.pdf', uploadedAt: subMonths(8), expiresAt: addMonths(16), approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(8), notes: null },
+  { id: 'doc-2', typeId: 'hipaa', fileName: 'HIPAA_2025.pdf', uploadedAt: subMonths(6), expiresAt: addMonths(18), approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(6), notes: null },
+  { id: 'doc-3', typeId: 'physical_exam', fileName: 'Physical_2026.pdf', uploadedAt: subMonths(2), expiresAt: addMonths(10), approvalStatus: 'approved', approvedBy: 'Robert', approvedAt: subMonths(2), notes: null },
+  { id: 'doc-4', typeId: 'hiv_aids', fileName: 'HIV_AIDS_2025.pdf', uploadedAt: subMonths(5), expiresAt: addMonths(19), approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(5), notes: null },
+  { id: 'doc-5', typeId: 'infection_control', fileName: 'Infection_Control_2025.pdf', uploadedAt: subMonths(7), expiresAt: addMonths(17), approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(7), notes: null },
+
+  // EXPIRING SOON (yellow) — within 30 days
+  { id: 'doc-6', typeId: 'cpr', fileName: 'CPR_2024.pdf', uploadedAt: subMonths(23), expiresAt: addMonths(0.5), approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(23), notes: null },
+  { id: 'doc-7', typeId: 'osha_tb', fileName: 'OSHA_TB_2025.pdf', uploadedAt: subMonths(11), expiresAt: addMonths(1), approvalStatus: 'approved', approvedBy: 'Robert', approvedAt: subMonths(11), notes: null },
+
+  // EXPIRED (red)
+  { id: 'doc-8', typeId: 'medical_errors', fileName: 'Medical_Errors_2023.pdf', uploadedAt: subMonths(26), expiresAt: subMonths(2), approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(26), notes: null },
+
+  // PENDING manager approval (blue)
+  { id: 'doc-9', typeId: 'child_abuse', fileName: 'Child_Abuse_2026.pdf', uploadedAt: subMonths(0.2), expiresAt: addMonths(24), approvalStatus: 'pending', approvedBy: null, approvedAt: null, notes: null },
+
+  // REJECTED (gray / needs re-upload)
+  { id: 'doc-10', typeId: 'year_eval', fileName: 'Year_Eval_2025.pdf', uploadedAt: subMonths(1), expiresAt: addMonths(11), approvalStatus: 'rejected', approvedBy: 'Nicole Chang', approvedAt: subMonths(1), notes: 'Signature page is missing. Please re-upload with all pages included.' },
+
+  // DOESN'T EXPIRE — approved
+  { id: 'doc-11', typeId: 'i9', fileName: 'I9_Form.pdf', uploadedAt: subMonths(30), expiresAt: null, approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(30), notes: null },
+  { id: 'doc-12', typeId: 'w4', fileName: 'W4_Form.pdf', uploadedAt: subMonths(30), expiresAt: null, approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(30), notes: null },
+  { id: 'doc-13', typeId: 'driver_license', fileName: 'Drivers_License.pdf', uploadedAt: subMonths(15), expiresAt: null, approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(15), notes: null },
+  { id: 'doc-14', typeId: 'application', fileName: 'Application.pdf', uploadedAt: subMonths(30), expiresAt: null, approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(30), notes: null },
+  { id: 'doc-15', typeId: 'ssn', fileName: 'SSN_Card.pdf', uploadedAt: subMonths(30), expiresAt: null, approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(30), notes: null },
+  { id: 'doc-16', typeId: 'confidentiality', fileName: 'Confidentiality.pdf', uploadedAt: subMonths(30), expiresAt: null, approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(30), notes: null },
+  { id: 'doc-17', typeId: 'orientation', fileName: 'Orientation_Complete.pdf', uploadedAt: subMonths(30), expiresAt: null, approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(30), notes: null },
+  { id: 'doc-18', typeId: 'hepatitis_b', fileName: 'HepB_Refusal_Signed.pdf', uploadedAt: subMonths(30), expiresAt: null, approvalStatus: 'approved', approvedBy: 'Nicole Chang', approvedAt: subMonths(30), notes: null },
+
+  // MISSING — document type is required but has no upload yet (handled by service)
+];
+
+// A few history entries so the detail screen can show a timeline.
+// Keyed by document id.
+export const MOCK_DOCUMENT_HISTORY = {
+  'doc-1': [
+    { id: 'h1', event: 'approved', actor: 'Nicole Chang', timestamp: subMonths(8), notes: 'License verified.' },
+    { id: 'h2', event: 'uploaded', actor: 'You', timestamp: subMonths(8), notes: null },
+  ],
+  'doc-6': [
+    { id: 'h3', event: 'approved', actor: 'Nicole Chang', timestamp: subMonths(23), notes: null },
+    { id: 'h4', event: 'uploaded', actor: 'You', timestamp: subMonths(23), notes: null },
+  ],
+  'doc-9': [
+    { id: 'h5', event: 'uploaded', actor: 'You', timestamp: subMonths(0.2), notes: 'Renewal before expiration.' },
+  ],
+  'doc-10': [
+    { id: 'h6', event: 'rejected', actor: 'Nicole Chang', timestamp: subMonths(1), notes: 'Signature page is missing. Please re-upload with all pages included.' },
+    { id: 'h7', event: 'uploaded', actor: 'You', timestamp: subMonths(1), notes: null },
+  ],
+};

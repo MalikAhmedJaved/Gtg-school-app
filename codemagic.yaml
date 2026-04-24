@@ -1,4 +1,4 @@
-# Codemagic configuration for React Native (Expo) - Cleaning Service Mobile
+# Codemagic configuration for Glory to God PPEC Mobile (React Native / Expo)
 # See: https://docs.codemagic.io/yaml-quick-start/building-a-react-native-app
 
 workflows:
@@ -17,7 +17,7 @@ workflows:
       groups:
         # Add codemagic-defaults or your env groups in Codemagic UI
       vars:
-        PACKAGE_NAME: "com.cleaningservice.mobile"
+        PACKAGE_NAME: "com.glorytogod.ppec"
     scripts:
       - name: Install npm dependencies
         script: |

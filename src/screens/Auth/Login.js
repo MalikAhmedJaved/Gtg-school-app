@@ -11,6 +11,11 @@ const bgImage = require('../../../assets/background.png');
 // Background image natural aspect ratio (1080x1920 = 9:16)
 const IMG_ASPECT = 1080 / 1920;
 
+// The login screen sits on a fixed light-blue background image regardless of
+// theme, so text colors here must stay dark — they don't follow dark mode.
+const LIGHT_BG_TEXT = '#1A252F';
+const LIGHT_BG_TEXT_MUTED = '#7F8C8D';
+
 const Login = ({ navigation }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -74,7 +79,7 @@ const Login = ({ navigation }) => {
                   value={formData.email}
                   onChangeText={(value) => handleChange('email', value)}
                   placeholder={t('app.auth.email', 'Email')}
-                  placeholderTextColor={colors.gray[400]}
+                  placeholderTextColor={LIGHT_BG_TEXT_MUTED}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoCorrect={false}
@@ -88,7 +93,7 @@ const Login = ({ navigation }) => {
                   value={formData.password}
                   onChangeText={(value) => handleChange('password', value)}
                   placeholder={t('app.auth.password', 'Password')}
-                  placeholderTextColor={colors.gray[400]}
+                  placeholderTextColor={LIGHT_BG_TEXT_MUTED}
                   secureTextEntry
                   autoCapitalize="none"
                 />
@@ -169,7 +174,7 @@ const makeStyles = (colors) =>
   label: {
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.semibold,
-    color: colors.textDark,
+    color: LIGHT_BG_TEXT,
     marginBottom: spacing.xs,
   },
   input: {
@@ -177,7 +182,7 @@ const makeStyles = (colors) =>
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     fontSize: typography.fontSize.md,
-    color: colors.textDark,
+    color: LIGHT_BG_TEXT,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.6)',
   },
@@ -211,7 +216,7 @@ const makeStyles = (colors) =>
     paddingVertical: spacing.xs,
   },
   signUpMuted: {
-    color: colors.textDark,
+    color: LIGHT_BG_TEXT,
     fontSize: typography.fontSize.sm,
     fontWeight: typography.fontWeight.medium,
   },

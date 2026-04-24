@@ -70,6 +70,39 @@
       "title": "Announcements & Events",
       "empty": "No announcements yet."
     },
+    "categories": {
+      "title": "Therapy Categories",
+      "subtitle": "Tap a category to see updates",
+      "updateToday": "{n} update today",
+      "updatesToday": "{n} updates today",
+      "update": "{n} update",
+      "updates": "{n} updates",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "emptyTitle": "No updates yet",
+      "emptyBody": "Updates from your child's {category} sessions will appear here."
+    },
+    "chat": {
+      "title": "Messages",
+      "subtitle": "Chat with your child's therapists",
+      "emptyTitle": "No conversations yet",
+      "emptyText": "Messages from therapists will appear here",
+      "startConversation": "Start a conversation!",
+      "placeholder": "Type a message..."
+    },
+    "notifications": {
+      "title": "Notifications",
+      "subtitle": "Latest posts from Glory to God PPEC",
+      "emptyTitle": "No notifications yet",
+      "emptyText": "New social posts will appear here.",
+      "viewOn": "View on",
+      "newPostInstagram": "New post on Instagram",
+      "newVideoYoutube": "New video on YouTube",
+      "justNow": "Just now",
+      "minsAgo": "{n}m ago",
+      "hoursAgo": "{n}h ago",
+      "daysAgo": "{n}d ago"
+    },
     "settings": {
       "title": "Settings",
       "appearance": "Appearance",

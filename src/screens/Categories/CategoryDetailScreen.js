@@ -11,14 +11,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { getUpdatesByCategory, getTherapistById } from '../../utils/mockData';
 
 export default function CategoryDetailScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { t, lr, language } = useLanguage();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { category } = route.params;
   const updates = getUpdatesByCategory(category.id);
+  const categoryName = lr(category.name);
 
   const renderUpdate = (update) => {
     const therapist = getTherapistById(update.therapistId);
@@ -32,9 +35,12 @@ export default function CategoryDetailScreen({ route, navigation }) {
     yesterday.setDate(yesterday.getDate() - 1);
     const isYesterday = updateDate >= yesterday && updateDate < today;
 
-    let dateLabel = updateDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    if (isToday) dateLabel = 'Today';
-    if (isYesterday) dateLabel = 'Yesterday';
+    let dateLabel = updateDate.toLocaleDateString(language === 'es' ? 'es-ES' : [], {
+      month: 'short',
+      day: 'numeric',
+    });
+    if (isToday) dateLabel = t('app.categories.today', 'Today');
+    if (isYesterday) dateLabel = t('app.categories.yesterday', 'Yesterday');
 
     return (
       <View key={update.id} style={styles.updateCard}>
@@ -50,7 +56,7 @@ export default function CategoryDetailScreen({ route, navigation }) {
             <Text style={styles.updateTime}>{update.time}</Text>
           </View>
         </View>
-        <Text style={styles.updateMessage}>{update.message}</Text>
+        <Text style={styles.updateMessage}>{lr(update.message)}</Text>
         {update.hasPhotos && update.photos && update.photos.length > 0 && (
           <View style={update.photos.length === 1 ? styles.singlePhotoWrap : styles.photoRow}>
             {update.photos.map((img, i) => (
@@ -75,8 +81,13 @@ export default function CategoryDetailScreen({ route, navigation }) {
         </TouchableOpacity>
         <Ionicons name={category.icon} size={28} color={colors.white} style={{ marginRight: spacing.sm }} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>{category.name}</Text>
-          <Text style={styles.headerSubtitle}>{updates.length} update{updates.length !== 1 ? 's' : ''}</Text>
+          <Text style={styles.headerTitle}>{categoryName}</Text>
+          <Text style={styles.headerSubtitle}>
+            {t(
+              updates.length === 1 ? 'app.categories.update' : 'app.categories.updates',
+              updates.length === 1 ? '{n} update' : '{n} updates'
+            ).replace('{n}', updates.length)}
+          </Text>
         </View>
       </View>
 
@@ -87,8 +98,13 @@ export default function CategoryDetailScreen({ route, navigation }) {
         {updates.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name={category.icon} size={64} color={colors.gray[300]} />
-            <Text style={styles.emptyTitle}>No updates yet</Text>
-            <Text style={styles.emptyText}>Updates from your child's {category.name.toLowerCase()} sessions will appear here.</Text>
+            <Text style={styles.emptyTitle}>{t('app.categories.emptyTitle', 'No updates yet')}</Text>
+            <Text style={styles.emptyText}>
+              {t(
+                'app.categories.emptyBody',
+                "Updates from your child's {category} sessions will appear here."
+              ).replace('{category}', categoryName.toLowerCase())}
+            </Text>
           </View>
         ) : (
           updates.map(renderUpdate)

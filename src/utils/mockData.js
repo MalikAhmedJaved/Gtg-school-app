@@ -1,40 +1,58 @@
 // Mock data for Glory to God PPEC app
+//
+// Translatable string fields are stored as { en, es } objects. Use the
+// lr() helper from LanguageContext to render them: lr(category.name).
 
 export const THERAPY_CATEGORIES = [
   {
     id: 'physical',
-    name: 'Physical Therapy',
+    name: { en: 'Physical Therapy', es: 'Terapia Física' },
     icon: 'fitness',
     color: '#E74C3C',
-    description: 'Improving mobility, strength, and motor skills',
+    description: {
+      en: 'Improving mobility, strength, and motor skills',
+      es: 'Mejorando la movilidad, fuerza y habilidades motoras',
+    },
   },
   {
     id: 'speech',
-    name: 'Speech Therapy',
+    name: { en: 'Speech Therapy', es: 'Terapia del Habla' },
     icon: 'chatbubble-ellipses',
     color: '#8E44AD',
-    description: 'Enhancing communication and language skills',
+    description: {
+      en: 'Enhancing communication and language skills',
+      es: 'Mejorando las habilidades de comunicación y lenguaje',
+    },
   },
   {
     id: 'occupational',
-    name: 'Occupational Therapy',
+    name: { en: 'Occupational Therapy', es: 'Terapia Ocupacional' },
     icon: 'hand-left',
     color: '#E67E22',
-    description: 'Building daily living and fine motor skills',
+    description: {
+      en: 'Building daily living and fine motor skills',
+      es: 'Desarrollando habilidades de la vida diaria y motoras finas',
+    },
   },
   {
     id: 'behavioral',
-    name: 'Behavioral Therapy',
+    name: { en: 'Behavioral Therapy', es: 'Terapia Conductual' },
     icon: 'happy',
     color: '#27AE60',
-    description: 'Supporting emotional and behavioral development',
+    description: {
+      en: 'Supporting emotional and behavioral development',
+      es: 'Apoyando el desarrollo emocional y conductual',
+    },
   },
   {
     id: 'nursing',
-    name: 'Nursing',
+    name: { en: 'Nursing', es: 'Enfermería' },
     icon: 'medkit',
     color: '#2980B9',
-    description: 'Medical care and health monitoring',
+    description: {
+      en: 'Medical care and health monitoring',
+      es: 'Atención médica y monitoreo de salud',
+    },
   },
 ];
 
@@ -43,7 +61,7 @@ export const THERAPISTS = [
     id: 1,
     name: 'Kim',
     fullName: 'Kim Rodriguez',
-    role: 'Occupational Therapy',
+    role: { en: 'Occupational Therapy', es: 'Terapia Ocupacional' },
     categoryId: 'occupational',
     color: '#E67E22',
     avatar: null,
@@ -52,7 +70,7 @@ export const THERAPISTS = [
     id: 2,
     name: 'Maria',
     fullName: 'Maria Santos',
-    role: 'Speech Therapy',
+    role: { en: 'Speech Therapy', es: 'Terapia del Habla' },
     categoryId: 'speech',
     color: '#8E44AD',
     avatar: null,
@@ -61,7 +79,7 @@ export const THERAPISTS = [
     id: 3,
     name: 'Jenny',
     fullName: 'Jenny Thompson',
-    role: 'Physical Therapy',
+    role: { en: 'Physical Therapy', es: 'Terapia Física' },
     categoryId: 'physical',
     color: '#E74C3C',
     avatar: null,
@@ -70,7 +88,7 @@ export const THERAPISTS = [
     id: 4,
     name: 'David',
     fullName: 'David Chen',
-    role: 'Behavioral Therapy',
+    role: { en: 'Behavioral Therapy', es: 'Terapia Conductual' },
     categoryId: 'behavioral',
     color: '#27AE60',
     avatar: null,
@@ -79,7 +97,7 @@ export const THERAPISTS = [
     id: 5,
     name: 'Lisa',
     fullName: 'Lisa Williams',
-    role: 'Nursing',
+    role: { en: 'Nursing', es: 'Enfermería' },
     categoryId: 'nursing',
     color: '#2980B9',
     avatar: null,
@@ -114,7 +132,10 @@ export const THERAPY_UPDATES = [
     categoryId: 'occupational',
     timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
     time: '9:45 AM',
-    message: 'Good morning! I worked on fine motor activities with Ethan today using some colorful stacking cups. He did a great job grasping and stacking them!',
+    message: {
+      en: 'Good morning! I worked on fine motor activities with Ethan today using some colorful stacking cups. He did a great job grasping and stacking them!',
+      es: '¡Buenos días! Hoy trabajé en actividades motoras finas con Ethan usando vasos apilables de colores. ¡Lo hizo muy bien al agarrarlos y apilarlos!',
+    },
     hasPhotos: true,
     photos: [IMAGES.colorByNumber, IMAGES.coloringTogether],
   },
@@ -124,7 +145,10 @@ export const THERAPY_UPDATES = [
     categoryId: 'speech',
     timestamp: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(),
     time: '11:15 AM',
-    message: 'Ethan had a productive speech therapy session today! He practiced identifying animal picture cards and repeating their names back. Here\'s a photo of him during the session.',
+    message: {
+      en: "Ethan had a productive speech therapy session today! He practiced identifying animal picture cards and repeating their names back. Here's a photo of him during the session.",
+      es: '¡Ethan tuvo una sesión productiva de terapia del habla hoy! Practicó identificar tarjetas con imágenes de animales y repetir sus nombres. Aquí hay una foto de él durante la sesión.',
+    },
     hasPhotos: true,
     photos: [IMAGES.childWithScreen],
   },
@@ -134,7 +158,10 @@ export const THERAPY_UPDATES = [
     categoryId: 'physical',
     timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
     time: '1:45 PM',
-    message: 'Ethan had a great time practicing walking with his gait trainer today! He managed to take some steps forward with my help. Here is a picture of him using the gait trainer.',
+    message: {
+      en: 'Ethan had a great time practicing walking with his gait trainer today! He managed to take some steps forward with my help. Here is a picture of him using the gait trainer.',
+      es: '¡Ethan se divirtió mucho practicando con su andador hoy! Logró dar algunos pasos hacia adelante con mi ayuda. Aquí hay una foto de él usando el andador.',
+    },
     hasPhotos: true,
     photos: [IMAGES.therapySession],
   },
@@ -144,7 +171,10 @@ export const THERAPY_UPDATES = [
     categoryId: 'behavioral',
     timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
     time: '2:30 PM',
-    message: 'We worked on social interaction skills today. Ethan did really well sharing toys with his peers during group play time. He showed great improvement in turn-taking!',
+    message: {
+      en: 'We worked on social interaction skills today. Ethan did really well sharing toys with his peers during group play time. He showed great improvement in turn-taking!',
+      es: 'Hoy trabajamos en habilidades de interacción social. Ethan lo hizo muy bien compartiendo juguetes con sus compañeros durante el juego en grupo. ¡Mostró una gran mejora en tomar turnos!',
+    },
     hasPhotos: true,
     photos: [IMAGES.kidsReading, IMAGES.staffBalloons],
   },
@@ -154,7 +184,10 @@ export const THERAPY_UPDATES = [
     categoryId: 'nursing',
     timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
     time: '3:00 PM',
-    message: 'All vitals checked and looking great today! Ethan had a good appetite at lunch and his medications were administered on schedule. He seems to be in great spirits!',
+    message: {
+      en: 'All vitals checked and looking great today! Ethan had a good appetite at lunch and his medications were administered on schedule. He seems to be in great spirits!',
+      es: '¡Todos los signos vitales revisados y luciendo muy bien hoy! Ethan tuvo buen apetito en el almuerzo y sus medicamentos se administraron a tiempo. ¡Parece estar de muy buen ánimo!',
+    },
     hasPhotos: true,
     photos: [IMAGES.boyEating, IMAGES.childEating],
   },
@@ -164,7 +197,10 @@ export const THERAPY_UPDATES = [
     categoryId: 'occupational',
     timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     time: '10:00 AM',
-    message: 'Yesterday we focused on sensory play activities. Ethan enjoyed the textured balls and showed great progress with his grip strength. He was very engaged throughout the session!',
+    message: {
+      en: 'Yesterday we focused on sensory play activities. Ethan enjoyed the textured balls and showed great progress with his grip strength. He was very engaged throughout the session!',
+      es: 'Ayer nos enfocamos en actividades de juego sensorial. A Ethan le encantaron las pelotas con textura y mostró un gran progreso en la fuerza de agarre. ¡Estuvo muy concentrado durante toda la sesión!',
+    },
     hasPhotos: true,
     photos: [IMAGES.gardenActivity, IMAGES.sunny, IMAGES.staffWithChild],
   },
@@ -174,7 +210,10 @@ export const THERAPY_UPDATES = [
     categoryId: 'speech',
     timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     time: '11:30 AM',
-    message: 'We practiced simple words and sounds using music therapy today. Ethan responded really well to the singing activities and tried to repeat some words!',
+    message: {
+      en: 'We practiced simple words and sounds using music therapy today. Ethan responded really well to the singing activities and tried to repeat some words!',
+      es: '¡Hoy practicamos palabras y sonidos simples usando terapia musical. Ethan respondió muy bien a las actividades de canto e intentó repetir algunas palabras!',
+    },
     hasPhotos: true,
     photos: [IMAGES.childSmiling],
   },
@@ -184,7 +223,10 @@ export const THERAPY_UPDATES = [
     categoryId: 'physical',
     timestamp: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
     time: '1:00 PM',
-    message: 'We did some stretching exercises and balance work on the therapy ball. Ethan is showing improved core strength and balance. Keep up the great work at home too!',
+    message: {
+      en: 'We did some stretching exercises and balance work on the therapy ball. Ethan is showing improved core strength and balance. Keep up the great work at home too!',
+      es: 'Hicimos algunos ejercicios de estiramiento y trabajo de equilibrio en la pelota de terapia. Ethan está mostrando mayor fuerza central y equilibrio. ¡Sigan con el buen trabajo en casa también!',
+    },
     hasPhotos: true,
     photos: [IMAGES.staffWithKids, IMAGES.babyInChair],
   },
@@ -194,72 +236,279 @@ export const MOCK_CHAT_CONVERSATIONS = [
   {
     id: 1,
     therapist: THERAPISTS[0],
-    lastMessage: 'Let me know if you have any questions about today\'s session!',
+    lastMessage: {
+      en: "Let me know if you have any questions about today's session!",
+      es: '¡Avísame si tienes alguna pregunta sobre la sesión de hoy!',
+    },
     lastMessageTime: '10:15 AM',
     unreadCount: 1,
   },
   {
     id: 2,
     therapist: THERAPISTS[1],
-    lastMessage: 'Ethan is making wonderful progress with his speech!',
+    lastMessage: {
+      en: 'Ethan is making wonderful progress with his speech!',
+      es: '¡Ethan está haciendo un maravilloso progreso con su habla!',
+    },
     lastMessageTime: '11:30 AM',
     unreadCount: 0,
   },
   {
     id: 3,
     therapist: THERAPISTS[2],
-    lastMessage: 'Here are some exercises you can practice at home.',
+    lastMessage: {
+      en: 'Here are some exercises you can practice at home.',
+      es: 'Aquí hay algunos ejercicios que pueden practicar en casa.',
+    },
     lastMessageTime: '2:00 PM',
     unreadCount: 2,
   },
   {
     id: 4,
     therapist: THERAPISTS[3],
-    lastMessage: 'Great session today! Ethan was very cooperative.',
-    lastMessageTime: 'Yesterday',
+    lastMessage: {
+      en: 'Great session today! Ethan was very cooperative.',
+      es: '¡Gran sesión hoy! Ethan fue muy cooperativo.',
+    },
+    lastMessageTime: { en: 'Yesterday', es: 'Ayer' },
     unreadCount: 0,
   },
   {
     id: 5,
     therapist: THERAPISTS[4],
-    lastMessage: 'All vitals are looking good. No concerns today.',
-    lastMessageTime: 'Yesterday',
+    lastMessage: {
+      en: 'All vitals are looking good. No concerns today.',
+      es: 'Los signos vitales se ven bien. Sin preocupaciones hoy.',
+    },
+    lastMessageTime: { en: 'Yesterday', es: 'Ayer' },
     unreadCount: 0,
   },
 ];
 
 export const MOCK_MESSAGES = {
   1: [
-    { id: 1, senderId: 1, text: 'Good morning! Just starting OT with Ethan now.', time: '9:30 AM', isMe: false },
-    { id: 2, senderId: 'parent', text: 'Great! How is he doing today?', time: '9:32 AM', isMe: true },
-    { id: 3, senderId: 1, text: 'He\'s in a wonderful mood! We\'re working on stacking cups today.', time: '9:35 AM', isMe: false },
-    { id: 4, senderId: 1, text: 'He did amazing with the fine motor activities! Attached some photos for you.', time: '10:00 AM', isMe: false },
-    { id: 5, senderId: 1, text: 'Let me know if you have any questions about today\'s session!', time: '10:15 AM', isMe: false },
+    {
+      id: 1,
+      senderId: 1,
+      text: {
+        en: 'Good morning! Just starting OT with Ethan now.',
+        es: '¡Buenos días! Justo comenzando TO con Ethan ahora.',
+      },
+      time: '9:30 AM',
+      isMe: false,
+    },
+    {
+      id: 2,
+      senderId: 'parent',
+      text: { en: 'Great! How is he doing today?', es: '¡Genial! ¿Cómo está hoy?' },
+      time: '9:32 AM',
+      isMe: true,
+    },
+    {
+      id: 3,
+      senderId: 1,
+      text: {
+        en: "He's in a wonderful mood! We're working on stacking cups today.",
+        es: '¡Está de muy buen ánimo! Hoy estamos trabajando con vasos apilables.',
+      },
+      time: '9:35 AM',
+      isMe: false,
+    },
+    {
+      id: 4,
+      senderId: 1,
+      text: {
+        en: 'He did amazing with the fine motor activities! Attached some photos for you.',
+        es: '¡Lo hizo increíble en las actividades motoras finas! Te adjunto algunas fotos.',
+      },
+      time: '10:00 AM',
+      isMe: false,
+    },
+    {
+      id: 5,
+      senderId: 1,
+      text: {
+        en: "Let me know if you have any questions about today's session!",
+        es: '¡Avísame si tienes alguna pregunta sobre la sesión de hoy!',
+      },
+      time: '10:15 AM',
+      isMe: false,
+    },
   ],
   2: [
-    { id: 1, senderId: 2, text: 'Hi! We had a great speech session today.', time: '11:00 AM', isMe: false },
-    { id: 2, senderId: 2, text: 'Ethan practiced identifying animals and saying their names.', time: '11:05 AM', isMe: false },
-    { id: 3, senderId: 'parent', text: 'That\'s wonderful! Has he been trying any new sounds?', time: '11:10 AM', isMe: true },
-    { id: 4, senderId: 2, text: 'Yes! He\'s been attempting "ma" and "da" sounds much more consistently.', time: '11:15 AM', isMe: false },
-    { id: 5, senderId: 2, text: 'Ethan is making wonderful progress with his speech!', time: '11:30 AM', isMe: false },
+    {
+      id: 1,
+      senderId: 2,
+      text: {
+        en: 'Hi! We had a great speech session today.',
+        es: '¡Hola! Tuvimos una gran sesión de habla hoy.',
+      },
+      time: '11:00 AM',
+      isMe: false,
+    },
+    {
+      id: 2,
+      senderId: 2,
+      text: {
+        en: 'Ethan practiced identifying animals and saying their names.',
+        es: 'Ethan practicó identificar animales y decir sus nombres.',
+      },
+      time: '11:05 AM',
+      isMe: false,
+    },
+    {
+      id: 3,
+      senderId: 'parent',
+      text: {
+        en: "That's wonderful! Has he been trying any new sounds?",
+        es: '¡Eso es maravilloso! ¿Ha estado intentando algún sonido nuevo?',
+      },
+      time: '11:10 AM',
+      isMe: true,
+    },
+    {
+      id: 4,
+      senderId: 2,
+      text: {
+        en: 'Yes! He\'s been attempting "ma" and "da" sounds much more consistently.',
+        es: '¡Sí! Ha estado intentando los sonidos "ma" y "da" con mucha más consistencia.',
+      },
+      time: '11:15 AM',
+      isMe: false,
+    },
+    {
+      id: 5,
+      senderId: 2,
+      text: {
+        en: 'Ethan is making wonderful progress with his speech!',
+        es: '¡Ethan está haciendo un maravilloso progreso con su habla!',
+      },
+      time: '11:30 AM',
+      isMe: false,
+    },
   ],
   3: [
-    { id: 1, senderId: 3, text: 'PT session complete! Ethan worked hard today.', time: '1:30 PM', isMe: false },
-    { id: 2, senderId: 'parent', text: 'How did he do with the walking exercises?', time: '1:35 PM', isMe: true },
-    { id: 3, senderId: 3, text: 'He took 5 assisted steps today! That\'s a new record for him.', time: '1:40 PM', isMe: false },
-    { id: 4, senderId: 'parent', text: 'Oh wow, that\'s amazing! We\'re so proud of him!', time: '1:42 PM', isMe: true },
-    { id: 5, senderId: 3, text: 'Here are some exercises you can practice at home.', time: '2:00 PM', isMe: false },
+    {
+      id: 1,
+      senderId: 3,
+      text: {
+        en: 'PT session complete! Ethan worked hard today.',
+        es: '¡Sesión de TF completada! Ethan trabajó duro hoy.',
+      },
+      time: '1:30 PM',
+      isMe: false,
+    },
+    {
+      id: 2,
+      senderId: 'parent',
+      text: {
+        en: 'How did he do with the walking exercises?',
+        es: '¿Cómo le fue con los ejercicios de caminar?',
+      },
+      time: '1:35 PM',
+      isMe: true,
+    },
+    {
+      id: 3,
+      senderId: 3,
+      text: {
+        en: "He took 5 assisted steps today! That's a new record for him.",
+        es: '¡Dio 5 pasos asistidos hoy! Ese es un nuevo récord para él.',
+      },
+      time: '1:40 PM',
+      isMe: false,
+    },
+    {
+      id: 4,
+      senderId: 'parent',
+      text: {
+        en: "Oh wow, that's amazing! We're so proud of him!",
+        es: '¡Vaya, eso es increíble! ¡Estamos muy orgullosos de él!',
+      },
+      time: '1:42 PM',
+      isMe: true,
+    },
+    {
+      id: 5,
+      senderId: 3,
+      text: {
+        en: 'Here are some exercises you can practice at home.',
+        es: 'Aquí hay algunos ejercicios que pueden practicar en casa.',
+      },
+      time: '2:00 PM',
+      isMe: false,
+    },
   ],
   4: [
-    { id: 1, senderId: 4, text: 'Behavioral therapy update for today!', time: '2:15 PM', isMe: false },
-    { id: 2, senderId: 4, text: 'We focused on social skills and sharing during group play.', time: '2:20 PM', isMe: false },
-    { id: 3, senderId: 4, text: 'Great session today! Ethan was very cooperative.', time: '2:30 PM', isMe: false },
+    {
+      id: 1,
+      senderId: 4,
+      text: {
+        en: 'Behavioral therapy update for today!',
+        es: '¡Actualización de terapia conductual de hoy!',
+      },
+      time: '2:15 PM',
+      isMe: false,
+    },
+    {
+      id: 2,
+      senderId: 4,
+      text: {
+        en: 'We focused on social skills and sharing during group play.',
+        es: 'Nos enfocamos en habilidades sociales y en compartir durante el juego en grupo.',
+      },
+      time: '2:20 PM',
+      isMe: false,
+    },
+    {
+      id: 3,
+      senderId: 4,
+      text: {
+        en: 'Great session today! Ethan was very cooperative.',
+        es: '¡Gran sesión hoy! Ethan fue muy cooperativo.',
+      },
+      time: '2:30 PM',
+      isMe: false,
+    },
   ],
   5: [
-    { id: 1, senderId: 5, text: 'Nursing check-in: All meds given on schedule.', time: '12:00 PM', isMe: false },
-    { id: 2, senderId: 'parent', text: 'Thank you! How was his appetite today?', time: '12:05 PM', isMe: true },
-    { id: 3, senderId: 5, text: 'He ate really well at lunch! Good appetite today.', time: '12:10 PM', isMe: false },
-    { id: 4, senderId: 5, text: 'All vitals are looking good. No concerns today.', time: '3:00 PM', isMe: false },
+    {
+      id: 1,
+      senderId: 5,
+      text: {
+        en: 'Nursing check-in: All meds given on schedule.',
+        es: 'Chequeo de enfermería: Todos los medicamentos administrados a tiempo.',
+      },
+      time: '12:00 PM',
+      isMe: false,
+    },
+    {
+      id: 2,
+      senderId: 'parent',
+      text: { en: 'Thank you! How was his appetite today?', es: '¡Gracias! ¿Cómo estuvo su apetito hoy?' },
+      time: '12:05 PM',
+      isMe: true,
+    },
+    {
+      id: 3,
+      senderId: 5,
+      text: {
+        en: 'He ate really well at lunch! Good appetite today.',
+        es: '¡Comió muy bien en el almuerzo! Buen apetito hoy.',
+      },
+      time: '12:10 PM',
+      isMe: false,
+    },
+    {
+      id: 4,
+      senderId: 5,
+      text: {
+        en: 'All vitals are looking good. No concerns today.',
+        es: 'Los signos vitales se ven bien. Sin preocupaciones hoy.',
+      },
+      time: '3:00 PM',
+      isMe: false,
+    },
   ],
 };
 

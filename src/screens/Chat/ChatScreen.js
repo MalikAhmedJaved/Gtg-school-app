@@ -13,12 +13,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { MOCK_CHAT_CONVERSATIONS, MOCK_MESSAGES, THERAPISTS } from '../../utils/mockData';
 
 // ─── CONVERSATION LIST ──────────────────────────────────────
 function ConversationList({ onSelect }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { t, lr } = useLanguage();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const renderItem = ({ item }) => {
@@ -35,14 +37,14 @@ function ConversationList({ onSelect }) {
         <View style={styles.conversationBody}>
           <View style={styles.conversationRow}>
             <Text style={styles.conversationName}>{therapist.fullName}</Text>
-            <Text style={styles.conversationTime}>{item.lastMessageTime}</Text>
+            <Text style={styles.conversationTime}>{lr(item.lastMessageTime)}</Text>
           </View>
           <View style={styles.conversationRow}>
             <Text
               style={[styles.conversationPreview, item.unreadCount > 0 && styles.unreadText]}
               numberOfLines={1}
             >
-              {item.lastMessage}
+              {lr(item.lastMessage)}
             </Text>
             {item.unreadCount > 0 && (
               <View style={[styles.badge, { backgroundColor: therapist.color }]}>
@@ -50,7 +52,7 @@ function ConversationList({ onSelect }) {
               </View>
             )}
           </View>
-          <Text style={[styles.roleTag, { color: therapist.color }]}>{therapist.role}</Text>
+          <Text style={[styles.roleTag, { color: therapist.color }]}>{lr(therapist.role)}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -59,8 +61,10 @@ function ConversationList({ onSelect }) {
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm }]}>
-        <Text style={styles.headerTitle}>Messages</Text>
-        <Text style={styles.headerSubtitle}>Chat with your child's therapists</Text>
+        <Text style={styles.headerTitle}>{t('app.chat.title', 'Messages')}</Text>
+        <Text style={styles.headerSubtitle}>
+          {t('app.chat.subtitle', "Chat with your child's therapists")}
+        </Text>
       </View>
 
       <FlatList
@@ -71,8 +75,10 @@ function ConversationList({ onSelect }) {
         ListEmptyComponent={
           <View style={styles.centered}>
             <Ionicons name="chatbubbles-outline" size={64} color={colors.gray[300]} />
-            <Text style={styles.emptyTitle}>No conversations yet</Text>
-            <Text style={styles.emptyText}>Messages from therapists will appear here</Text>
+            <Text style={styles.emptyTitle}>{t('app.chat.emptyTitle', 'No conversations yet')}</Text>
+            <Text style={styles.emptyText}>
+              {t('app.chat.emptyText', 'Messages from therapists will appear here')}
+            </Text>
           </View>
         }
       />
@@ -84,6 +90,7 @@ function ConversationList({ onSelect }) {
 function ChatThread({ conversation, onBack }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { t, lr } = useLanguage();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { therapist } = conversation;
   const [messages, setMessages] = useState(MOCK_MESSAGES[therapist.id] || []);
@@ -97,7 +104,7 @@ function ChatThread({ conversation, onBack }) {
     const newMsg = {
       id: Date.now(),
       senderId: 'parent',
-      text,
+      text, // user-typed plain string
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isMe: true,
     };
@@ -105,13 +112,28 @@ function ChatThread({ conversation, onBack }) {
     setMessages(prev => [...prev, newMsg]);
     setInput('');
 
-    // Simulate therapist reply after 2 seconds
+    // Simulate therapist reply after 2 seconds. Replies are stored as
+    // bilingual objects so they translate when the user toggles language.
     setTimeout(() => {
       const replies = [
-        `Thank you for your message! I'll get back to you shortly.`,
-        `That's a great question! Let me look into that for you.`,
-        `I appreciate you reaching out. We'll discuss this further in our next session.`,
-        `Absolutely! ${conversation.therapist.name === 'Lisa' ? 'I\'ll check on that for you.' : 'We can work on that during our next therapy session.'}`,
+        {
+          en: "Thank you for your message! I'll get back to you shortly.",
+          es: '¡Gracias por tu mensaje! Te responderé en breve.',
+        },
+        {
+          en: "That's a great question! Let me look into that for you.",
+          es: '¡Buena pregunta! Lo investigaré para ti.',
+        },
+        {
+          en: "I appreciate you reaching out. We'll discuss this further in our next session.",
+          es: 'Aprecio que te hayas comunicado. Hablaremos más sobre esto en nuestra próxima sesión.',
+        },
+        therapist.name === 'Lisa'
+          ? { en: "Absolutely! I'll check on that for you.", es: '¡Por supuesto! Lo revisaré para ti.' }
+          : {
+              en: 'Absolutely! We can work on that during our next therapy session.',
+              es: '¡Por supuesto! Podemos trabajar en eso durante nuestra próxima sesión de terapia.',
+            },
       ];
       const replyMsg = {
         id: Date.now() + 1,
@@ -133,7 +155,7 @@ function ChatThread({ conversation, onBack }) {
           </View>
         )}
         <View style={[styles.msgContent, item.isMe ? styles.msgContentMe : styles.msgContentOther]}>
-          <Text style={[styles.messageText, item.isMe && styles.messageTextMe]}>{item.text}</Text>
+          <Text style={[styles.messageText, item.isMe && styles.messageTextMe]}>{lr(item.text)}</Text>
           <Text style={[styles.messageTime, item.isMe && styles.messageTimeMe]}>{item.time}</Text>
         </View>
       </View>
@@ -151,7 +173,7 @@ function ChatThread({ conversation, onBack }) {
         </View>
         <View style={styles.threadHeaderInfo}>
           <Text style={styles.threadTitle}>{therapist.fullName}</Text>
-          <Text style={styles.threadRole}>{therapist.role}</Text>
+          <Text style={styles.threadRole}>{lr(therapist.role)}</Text>
         </View>
       </View>
 
@@ -164,7 +186,7 @@ function ChatThread({ conversation, onBack }) {
         ListEmptyComponent={
           <View style={styles.centered}>
             <Ionicons name="chatbubble-outline" size={48} color={colors.gray[300]} />
-            <Text style={styles.emptyText}>Start a conversation!</Text>
+            <Text style={styles.emptyText}>{t('app.chat.startConversation', 'Start a conversation!')}</Text>
           </View>
         }
         onContentSizeChange={() => {
@@ -183,7 +205,7 @@ function ChatThread({ conversation, onBack }) {
             style={styles.chatInput}
             value={input}
             onChangeText={setInput}
-            placeholder="Type a message..."
+            placeholder={t('app.chat.placeholder', 'Type a message...')}
             placeholderTextColor={colors.textLight}
             multiline
             maxLength={1000}

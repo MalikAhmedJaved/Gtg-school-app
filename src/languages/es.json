@@ -70,6 +70,39 @@
       "title": "Anuncios y eventos",
       "empty": "No hay anuncios todavía."
     },
+    "categories": {
+      "title": "Categorías de terapia",
+      "subtitle": "Toca una categoría para ver las actualizaciones",
+      "updateToday": "{n} actualización hoy",
+      "updatesToday": "{n} actualizaciones hoy",
+      "update": "{n} actualización",
+      "updates": "{n} actualizaciones",
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "emptyTitle": "No hay actualizaciones todavía",
+      "emptyBody": "Las actualizaciones de las sesiones de {category} de tu hijo aparecerán aquí."
+    },
+    "chat": {
+      "title": "Mensajes",
+      "subtitle": "Chatea con los terapeutas de tu hijo",
+      "emptyTitle": "Aún no hay conversaciones",
+      "emptyText": "Los mensajes de los terapeutas aparecerán aquí",
+      "startConversation": "¡Inicia una conversación!",
+      "placeholder": "Escribe un mensaje..."
+    },
+    "notifications": {
+      "title": "Notificaciones",
+      "subtitle": "Últimas publicaciones de Glory to God PPEC",
+      "emptyTitle": "No hay notificaciones todavía",
+      "emptyText": "Las nuevas publicaciones aparecerán aquí.",
+      "viewOn": "Ver en",
+      "newPostInstagram": "Nueva publicación en Instagram",
+      "newVideoYoutube": "Nuevo video en YouTube",
+      "justNow": "Ahora mismo",
+      "minsAgo": "hace {n}m",
+      "hoursAgo": "hace {n}h",
+      "daysAgo": "hace {n}d"
+    },
     "settings": {
       "title": "Configuración",
       "appearance": "Apariencia",

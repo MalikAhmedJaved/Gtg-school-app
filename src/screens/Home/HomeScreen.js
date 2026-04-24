@@ -55,7 +55,7 @@ export default function HomeScreen({ navigation }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { userData } = useAuth();
-  const { t } = useLanguage();
+  const { t, lr } = useLanguage();
   const updates = getAllUpdates();
   const childName = userData?.childName || 'your child';
 
@@ -80,13 +80,13 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.therapistNameRow}>
               <Text style={styles.therapistName}>{therapist.name}</Text>
               <Text style={[styles.therapistRole, { color: therapist.color }]}>
-                ({therapist.role})
+                ({lr(therapist.role)})
               </Text>
             </View>
             <Text style={styles.updateTime}>{update.time}</Text>
           </View>
         </View>
-        <Text style={styles.updateMessage}>{update.message}</Text>
+        <Text style={styles.updateMessage}>{lr(update.message)}</Text>
         {update.hasPhotos && update.photos && update.photos.length > 0 && (
           <View style={update.photos.length === 1 ? styles.singlePhotoContainer : styles.photoGrid}>
             {update.photos.map((img, i) => (

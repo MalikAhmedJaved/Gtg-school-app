@@ -10,18 +10,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { THERAPY_CATEGORIES, getUpdatesByCategory } from '../../utils/mockData';
 
 export default function CategoriesScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { t, lr } = useLanguage();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.md) + spacing.sm }]}>
-        <Text style={styles.headerTitle}>Therapy Categories</Text>
-        <Text style={styles.headerSubtitle}>Tap a category to see updates</Text>
+        <Text style={styles.headerTitle}>
+          {t('app.categories.title', 'Therapy Categories')}
+        </Text>
+        <Text style={styles.headerSubtitle}>
+          {t('app.categories.subtitle', 'Tap a category to see updates')}
+        </Text>
       </View>
 
       <ScrollView
@@ -47,13 +53,18 @@ export default function CategoriesScreen({ navigation }) {
                 <Ionicons name={category.icon} size={32} color={category.color} />
               </View>
               <View style={styles.categoryInfo}>
-                <Text style={styles.categoryName}>{category.name}</Text>
-                <Text style={styles.categoryDescription}>{category.description}</Text>
+                <Text style={styles.categoryName}>{lr(category.name)}</Text>
+                <Text style={styles.categoryDescription}>{lr(category.description)}</Text>
                 {todayCount > 0 && (
                   <View style={styles.badgeRow}>
                     <View style={[styles.badge, { backgroundColor: category.color }]}>
                       <Text style={styles.badgeText}>
-                        {todayCount} update{todayCount > 1 ? 's' : ''} today
+                        {t(
+                          todayCount > 1
+                            ? 'app.categories.updatesToday'
+                            : 'app.categories.updateToday',
+                          todayCount > 1 ? '{n} updates today' : '{n} update today'
+                        ).replace('{n}', todayCount)}
                       </Text>
                     </View>
                   </View>

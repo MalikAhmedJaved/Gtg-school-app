@@ -15,15 +15,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, typography, borderRadius, shadows } from '../../constants/theme';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 const DUMMY_POSTS = [
   {
     id: 'ig-1',
     source: 'instagram',
     handle: '@glorytogodppec',
-    title: 'New post on Instagram',
-    caption:
-      'Another joyful day at Glory to God PPEC! Our little ones had so much fun during music therapy today. Swipe to see their smiles!',
+    caption: {
+      en: 'Another joyful day at Glory to God PPEC! Our little ones had so much fun during music therapy today. Swipe to see their smiles!',
+      es: '¡Otro día alegre en Glory to God PPEC! Nuestros pequeños se divirtieron mucho durante la terapia musical hoy. ¡Desliza para ver sus sonrisas!',
+    },
     thumbnail: 'https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=600&q=80',
     url: 'https://www.instagram.com/glorytogodppec/',
     createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
@@ -32,9 +34,10 @@ const DUMMY_POSTS = [
     id: 'yt-1',
     source: 'youtube',
     handle: 'Glory to God PPEC',
-    title: 'New video on YouTube',
-    caption:
-      'Watch how our occupational therapy team helps children build confidence and independence through play-based learning.',
+    caption: {
+      en: 'Watch how our occupational therapy team helps children build confidence and independence through play-based learning.',
+      es: 'Mira cómo nuestro equipo de terapia ocupacional ayuda a los niños a desarrollar confianza e independencia a través del aprendizaje basado en el juego.',
+    },
     thumbnail: 'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=600&q=80',
     url: 'https://www.youtube.com/@glorytogodppec',
     createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
@@ -43,9 +46,10 @@ const DUMMY_POSTS = [
     id: 'ig-2',
     source: 'instagram',
     handle: '@glorytogodppec',
-    title: 'New post on Instagram',
-    caption:
-      'Celebrating milestones big and small. Huge congrats to our superstar for taking their first independent steps today!',
+    caption: {
+      en: 'Celebrating milestones big and small. Huge congrats to our superstar for taking their first independent steps today!',
+      es: 'Celebrando hitos grandes y pequeños. ¡Felicitaciones a nuestra superestrella por dar sus primeros pasos independientes hoy!',
+    },
     thumbnail: 'https://images.unsplash.com/photo-1503919005314-30d93d07d823?w=600&q=80',
     url: 'https://www.instagram.com/glorytogodppec/',
     createdAt: new Date(Date.now() - 22 * 60 * 60 * 1000).toISOString(),
@@ -54,9 +58,10 @@ const DUMMY_POSTS = [
     id: 'yt-2',
     source: 'youtube',
     handle: 'Glory to God PPEC',
-    title: 'New video on YouTube',
-    caption:
-      'A day in the life at our PPEC center — meet the caring team behind every smile.',
+    caption: {
+      en: 'A day in the life at our PPEC center — meet the caring team behind every smile.',
+      es: 'Un día en la vida de nuestro centro PPEC: conoce al cariñoso equipo detrás de cada sonrisa.',
+    },
     thumbnail: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?w=600&q=80',
     url: 'https://www.youtube.com/@glorytogodppec',
     createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
@@ -65,45 +70,39 @@ const DUMMY_POSTS = [
     id: 'ig-3',
     source: 'instagram',
     handle: '@glorytogodppec',
-    title: 'New post on Instagram',
-    caption:
-      'Sensory-friendly activities keep our kids engaged and growing every day. Thank you to our amazing therapists!',
+    caption: {
+      en: 'Sensory-friendly activities keep our kids engaged and growing every day. Thank you to our amazing therapists!',
+      es: 'Las actividades amigables a los sentidos mantienen a nuestros niños comprometidos y creciendo cada día. ¡Gracias a nuestros increíbles terapeutas!',
+    },
     thumbnail: 'https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=600&q=80',
     url: 'https://www.instagram.com/glorytogodppec/',
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
   },
 ];
 
-function formatWhen(dateInput) {
+function formatWhen(dateInput, t, language) {
   if (!dateInput) return '';
   const date = new Date(dateInput);
   if (Number.isNaN(date.getTime())) return '';
   const diffMs = Date.now() - date.getTime();
   const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t('app.notifications.justNow', 'Just now');
+  if (mins < 60) return t('app.notifications.minsAgo', '{n}m ago').replace('{n}', mins);
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('app.notifications.hoursAgo', '{n}h ago').replace('{n}', hours);
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString('en-GB');
+  if (days < 7) return t('app.notifications.daysAgo', '{n}d ago').replace('{n}', days);
+  return date.toLocaleDateString(language === 'es' ? 'es-ES' : 'en-GB');
 }
 
 const SOURCE_META = {
-  instagram: {
-    label: 'Instagram',
-    icon: 'logo-instagram',
-    color: '#E1306C',
-  },
-  youtube: {
-    label: 'YouTube',
-    icon: 'logo-youtube',
-    color: '#FF0000',
-  },
+  instagram: { label: 'Instagram', icon: 'logo-instagram', color: '#E1306C' },
+  youtube: { label: 'YouTube', icon: 'logo-youtube', color: '#FF0000' },
 };
 
 const NotificationsScreen = () => {
   const { colors } = useTheme();
+  const { t, lr, language } = useLanguage();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [refreshing, setRefreshing] = useState(false);
   const [posts, setPosts] = useState(DUMMY_POSTS);
@@ -121,11 +120,18 @@ const NotificationsScreen = () => {
     Linking.openURL(url).catch((err) => console.warn('Failed to open link:', err));
   };
 
+  const titleForSource = (source) =>
+    source === 'youtube'
+      ? t('app.notifications.newVideoYoutube', 'New video on YouTube')
+      : t('app.notifications.newPostInstagram', 'New post on Instagram');
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Notifications</Text>
-        <Text style={styles.subtitle}>Latest posts from Glory to God PPEC</Text>
+        <Text style={styles.title}>{t('app.notifications.title', 'Notifications')}</Text>
+        <Text style={styles.subtitle}>
+          {t('app.notifications.subtitle', 'Latest posts from Glory to God PPEC')}
+        </Text>
       </View>
 
       <ScrollView
@@ -138,8 +144,12 @@ const NotificationsScreen = () => {
         {posts.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="notifications-off-outline" size={44} color={colors.gray[400]} />
-            <Text style={styles.emptyTitle}>No notifications yet</Text>
-            <Text style={styles.emptyText}>New social posts will appear here.</Text>
+            <Text style={styles.emptyTitle}>
+              {t('app.notifications.emptyTitle', 'No notifications yet')}
+            </Text>
+            <Text style={styles.emptyText}>
+              {t('app.notifications.emptyText', 'New social posts will appear here.')}
+            </Text>
           </View>
         ) : (
           posts.map((item) => {
@@ -156,7 +166,7 @@ const NotificationsScreen = () => {
                     <Ionicons name={meta.icon} size={14} color={colors.white} />
                     <Text style={styles.sourceBadgeText}>{meta.label}</Text>
                   </View>
-                  <Text style={styles.cardTime}>{formatWhen(item.createdAt)}</Text>
+                  <Text style={styles.cardTime}>{formatWhen(item.createdAt, t, language)}</Text>
                 </View>
 
                 {item.thumbnail ? (
@@ -164,14 +174,14 @@ const NotificationsScreen = () => {
                 ) : null}
 
                 <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>{item.title}</Text>
+                  <Text style={styles.cardTitle}>{titleForSource(item.source)}</Text>
                   <Text style={styles.cardHandle}>{item.handle}</Text>
                   <Text style={styles.cardMessage} numberOfLines={3}>
-                    {item.caption}
+                    {lr(item.caption)}
                   </Text>
                   <View style={styles.openRow}>
                     <Text style={[styles.openLink, { color: meta.color }]}>
-                      View on {meta.label}
+                      {t('app.notifications.viewOn', 'View on')} {meta.label}
                     </Text>
                     <Ionicons name="open-outline" size={14} color={meta.color} />
                   </View>
